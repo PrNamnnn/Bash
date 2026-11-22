@@ -1,0 +1,391 @@
+sort:
+  category: Text
+  origin: posix-utility
+  summary: Sort lines of text alphabetically, numerically, by field, or by human-readable size.
+  why: >-
+    Sorted data is easier to read and is required by tools like `uniq` and `comm`. `sort` is also how pipelines
+    produce "top N" rankings.
+  syntax:
+    - sort [OPTION]... [FILE]...
+  flags:
+    - flag: -n
+      description: Numeric sort (10 after 9, not after 1).
+    - flag: -r
+      description: Reverse order.
+    - flag: -u
+      description: Output unique lines only.
+    - flag: -k N[,M]
+      description: Sort by field N (through M). Add modifiers like `-k2,2n`.
+    - flag: -t SEP
+      description: Field separator, e.g. `-t,` for CSV.
+    - flag: -h
+      description: Human numeric sort — understands 2K, 15M, 1G (GNU).
+    - flag: -f
+      description: Ignore case.
+    - flag: -V
+      description: Version sort — 1.9 before 1.10 (GNU).
+  examples:
+    - code: sort data/fruits.txt
+      description: Alphabetical.
+    - code: sort -n data/numbers.txt
+      description: Numeric — compare with plain `sort` to see why `-n` matters.
+    - code: sort -t, -k4,4nr data/sales.csv | head -3
+      description: CSV rows with the most units first.
+    - code: du -sh * | sort -h
+      description: Directories by size, smallest to largest.
+  useCases:
+    - Ranking (combined with uniq -c and head); preparing input for uniq/comm/join; ordering reports.
+  mistakes:
+    - Forgetting `-n` for numbers, so 100 sorts before 9.
+    - "Locale surprises: `sort` order depends on LC_ALL/LANG. Use `LC_ALL=C sort` for byte order and speed."
+    - Using `-k2` (field 2 to end of line) when you mean `-k2,2` (just field 2).
+  related: [uniq, cut, head]
+  portability: "`-h`, `-V` and `-R` are GNU extensions (also in modern macOS sort)."
+
+uniq:
+  category: Text
+  origin: posix-utility
+  summary: Collapse or count adjacent duplicate lines.
+  why: Counting occurrences ("how many requests per IP?") is a core analysis step; `sort | uniq -c` is the classic idiom.
+  syntax:
+    - uniq [-c] [-d] [-u] [-i] [INPUT [OUTPUT]]
+  flags:
+    - flag: -c
+      description: Prefix lines with their count.
+    - flag: -d
+      description: Only print duplicated lines.
+    - flag: -u
+      description: Only print lines that appear once.
+    - flag: -i
+      description: Ignore case.
+  examples:
+    - code: sort data/fruits.txt | uniq
+      description: Distinct values (same as `sort -u`).
+    - code: sort data/fruits.txt | uniq -c | sort -rn
+      description: Frequency table, most common first.
+      output: |2
+              3 apple
+              2 cherry
+              2 banana
+              1 fig
+              1 elderberry
+              1 date
+  useCases:
+    - Frequency counts; finding duplicates in lists.
+  mistakes:
+    - Running `uniq` on unsorted input — it only collapses *adjacent* duplicates.
+  related: [sort, wc]
+
+cut:
+  category: Text
+  origin: posix-utility
+  summary: Extract columns (fields) or character ranges from each line.
+  why: Structured text — CSV, /etc/passwd, logs — is often column-oriented. `cut` grabs the columns you need quickly.
+  syntax:
+    - cut -d DELIM -f LIST [FILE]...
+    - cut -c LIST [FILE]...
+  flags:
+    - flag: -d DELIM
+      description: Field delimiter (one character; default is TAB).
+    - flag: -f LIST
+      description: Fields to keep, e.g. `1`, `1,3`, `2-4`, `3-`.
+    - flag: -c LIST
+      description: Character positions to keep.
+    - flag: -s
+      description: Skip lines without the delimiter.
+  examples:
+    - code: cut -d: -f1,7 /etc/passwd
+      description: User names and their login shells.
+    - code: cut -d, -f2 data/users.csv | tail -n +2
+      description: The name column of a CSV, without the header.
+    - code: cut -c1-10 logs/app.log
+      description: Just the date part of each log line.
+  useCases:
+    - Pulling columns from CSV/TSV and colon-separated system files.
+  mistakes:
+    - "Using `cut -d' '` on text with runs of spaces — every space is a separator, so fields shift. Use `awk '{print $2}'` instead."
+    - "Quoted CSV fields containing commas break `cut -d,`."
+  related: [awk, paste, tr]
+
+paste:
+  category: Text
+  origin: posix-utility
+  summary: Join lines of files side by side, or join all lines of one file.
+  why: The opposite of `cut` — it merges columns, and `paste -s` turns a list into one delimited line.
+  syntax:
+    - paste [-d DELIMS] [-s] FILE...
+  flags:
+    - flag: -d DELIMS
+      description: Delimiter(s) to use instead of TAB.
+    - flag: -s
+      description: Serial — join all lines of each file into one line.
+  examples:
+    - code: paste -d, names.txt emails.txt
+      description: Combine two lists into CSV rows.
+    - code: seq 5 | paste -sd+ | bc
+      description: Build `1+2+3+4+5` and calculate it.
+    - code: paste -sd, data/fruits.txt
+      description: A comma-separated list in one line.
+  useCases:
+    - Building CSV from separate lists; joining lines for summaries.
+  mistakes:
+    - Expecting `-d` to accept multi-character strings — each character is used in turn.
+  related: [cut, tr]
+
+tr:
+  category: Text
+  origin: posix-utility
+  summary: Translate, squeeze or delete characters from standard input.
+  why: Character-level transformations — case conversion, replacing separators, removing unwanted characters.
+  syntax:
+    - tr SET1 SET2
+    - tr -d SET1
+    - tr -s SET1
+  flags:
+    - flag: -d
+      description: Delete characters in SET1.
+    - flag: -s
+      description: Squeeze repeats of characters into one.
+    - flag: -c
+      description: Complement — use every character NOT in SET1.
+  examples:
+    - code: echo hello | tr a-z A-Z
+      description: Upper-case.
+      output: HELLO
+    - code: tr ',' '\t' < data/sales.csv | head -2
+      description: CSV to TSV.
+    - code: tr -s ' ' < report.txt
+      description: Collapse runs of spaces.
+    - code: tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 16; echo
+      description: A random 16-character password — delete everything except alphanumerics.
+  useCases:
+    - Normalising text before processing; generating random strings; removing Windows `\r`.
+  mistakes:
+    - "Passing a file name: `tr a-z A-Z file` is an error — `tr` only reads stdin. Use `< file`."
+    - Expecting `tr` to replace words; it maps single characters. Use `sed` for strings.
+  related: [sed, cut]
+
+tee:
+  category: Text
+  origin: posix-utility
+  summary: Copy standard input to standard output AND to files.
+  why: Save an intermediate result or a log while still letting the data flow on through the pipeline or to the screen.
+  syntax:
+    - tee [-a] FILE...
+  flags:
+    - flag: -a
+      description: Append instead of overwriting.
+  examples:
+    - code: ./deploy.sh 2>&1 | tee deploy.log
+      description: Watch a command's output live while also logging it.
+    - code: echo '127.0.0.1 test.local' | sudo tee -a /etc/hosts
+      description: Append to a root-owned file — `sudo echo ... >> file` fails because the redirection runs as you.
+  useCases:
+    - Logging long-running jobs; debugging pipelines by saving intermediate stages; writing privileged files with sudo.
+  mistakes:
+    - Forgetting `-a` and overwriting a log file.
+  related: [cat]
+
+xargs:
+  category: Text
+  origin: posix-utility
+  summary: Build and run command lines from items read on standard input.
+  why: >-
+    Many commands take file names as arguments, not on stdin. `xargs` bridges the gap — and batches arguments to
+    avoid "argument list too long" errors.
+  syntax:
+    - xargs [OPTION]... [COMMAND [INITIAL-ARGS]...]
+  flags:
+    - flag: -0
+      description: Items are NUL-separated (pair with `find -print0`) — safe for any file name.
+    - flag: -n N
+      description: At most N arguments per command.
+    - flag: -I {}
+      description: Run once per line, replacing {} with the item.
+    - flag: -P N
+      description: Run up to N commands in parallel (GNU/BSD).
+    - flag: -r
+      description: Don't run the command if input is empty (GNU default on BSD).
+    - flag: -t
+      description: Print each command before running it.
+  examples:
+    - code: find . -name '*.log' -print0 | xargs -0 rm --
+      description: Delete matching files safely, whatever their names.
+    - code: cat servers.txt | xargs -I {} ssh {} uptime
+      description: Run a command per host.
+    - code: printf '%s\n' a b c d | xargs -n 2 echo
+      description: Group arguments.
+      output: |
+        a b
+        c d
+    - code: find . -name '*.png' -print0 | xargs -0 -P 4 -n 10 optipng
+      description: Process files four at a time in parallel.
+  useCases:
+    - Bulk operations on find results; parallelism; turning lists into arguments.
+  mistakes:
+    - Plain `xargs` splits on spaces and interprets quotes — file names with spaces break. Use `-0` with `find -print0`.
+    - "With empty input, GNU xargs still runs the command once (e.g. `rm` with no args). Add `-r`."
+  related: [find]
+
+diff:
+  category: Text
+  origin: posix-utility
+  summary: Show line-by-line differences between two files.
+  why: Knowing exactly what changed — in configs, outputs or code — is fundamental to debugging and reviewing.
+  syntax:
+    - diff [-u] [-q] [-r] FILE1 FILE2
+  flags:
+    - flag: -u
+      description: Unified format with context — the format of patches and `git diff`.
+    - flag: -q
+      description: Only report whether files differ.
+    - flag: -r
+      description: Compare directories recursively.
+    - flag: -i / -w
+      description: Ignore case / all whitespace.
+  examples:
+    - code: diff data/old.txt data/new.txt
+      description: Normal format — `3c3` means line 3 changed, `4a5` means a line was added.
+      output: |
+        3c3
+        < gamma
+        ---
+        > GAMMA
+        4a5
+        > epsilon
+    - code: diff -u app.conf.bak app.conf
+      description: Unified diff — lines prefixed with `-` and `+`.
+    - code: diff <(sort a.txt) <(sort b.txt)
+      description: Compare command outputs using process substitution.
+  useCases:
+    - Reviewing config changes; testing scripts by comparing actual and expected output (exit status 0 = identical).
+  mistakes:
+    - Reading the exit status as an error — diff exits 1 when files differ and 2 on real errors.
+  related: [cmp, comm]
+
+cmp:
+  category: Text
+  origin: posix-utility
+  summary: Compare two files byte by byte.
+  why: Fast and exact — tells you whether files are identical and where the first difference is, including for binary files.
+  syntax:
+    - cmp [-s] FILE1 FILE2
+  flags:
+    - flag: -s
+      description: Silent; only the exit status tells the answer.
+  examples:
+    - code: cmp data/old.txt data/new.txt
+      description: Report the first differing byte.
+      output: data/old.txt data/new.txt differ: byte 12, line 3
+    - code: cmp -s a.bin b.bin && echo same
+      description: Use in conditions.
+  useCases:
+    - Checking that a copy or download is identical; comparing binary files.
+  mistakes:
+    - Expecting a list of all differences — use `diff` for text.
+  related: [diff]
+
+comm:
+  category: Text
+  origin: posix-utility
+  summary: Compare two sorted files and show lines unique to each and common to both.
+  why: Set operations on lists — which users are in A but not B, which packages were added.
+  syntax:
+    - comm [-123] FILE1 FILE2
+  flags:
+    - flag: -1 / -2 / -3
+      description: Suppress column 1 (only in FILE1), 2 (only in FILE2) or 3 (in both).
+  examples:
+    - code: comm -13 <(sort old.txt) <(sort new.txt)
+      description: Lines added in new.txt.
+    - code: comm -12 <(sort a) <(sort b)
+      description: The intersection.
+  useCases:
+    - Comparing user lists, package lists, server inventories.
+  mistakes:
+    - Feeding unsorted input — results are wrong. Sort with the same locale first.
+  related: [diff, sort, uniq]
+
+sed:
+  category: Text
+  origin: posix-utility
+  summary: Stream editor — apply editing commands (substitute, delete, print) to each line.
+  why: >-
+    Editing files non-interactively is essential for automation: change a config value, rewrite paths, strip
+    comments, extract sections. `sed` does it in a pipeline or in place.
+  syntax:
+    - sed [-n] [-E] SCRIPT [FILE]...
+    - sed -i[SUFFIX] SCRIPT FILE...   (GNU)
+  flags:
+    - flag: -n
+      description: Don't print lines automatically; print only with `p`.
+    - flag: -E
+      description: Extended regular expressions.
+    - flag: -i
+      description: Edit files in place (GNU; BSD needs `-i ''`).
+    - flag: -e SCRIPT
+      description: Add a script; can be repeated.
+    - flag: s/RE/REPL/g
+      description: Substitute matches of RE with REPL; `g` = all matches on the line, `I` = ignore case.
+    - flag: Nd / /RE/d
+      description: Delete line N / lines matching RE.
+    - flag: -n 'N,Mp'
+      description: Print lines N through M.
+  examples:
+    - code: sed 's/ERROR/error/' logs/app.log | head -5
+      description: Replace the first match on each line.
+    - code: sed -n '5,10p' notes.txt
+      description: Print a range of lines.
+    - code: sed -E 's/^(\w+) (\w+)$/\2, \1/' <<< 'Ada Lovelace'
+      description: Capture groups reorder text.
+      output: Lovelace, Ada
+    - code: sed -i 's/^port=.*/port=9090/' ~/.config/app.conf
+      description: Change a config value in place (GNU).
+    - code: sed '/^#/d; /^$/d' config.ini
+      description: Strip comments and blank lines.
+  useCases:
+    - Config edits in provisioning scripts; text cleanup; extracting line ranges.
+  mistakes:
+    - Using `/` as the delimiter when the text contains slashes — pick another, e.g. `s|/usr/local|/opt|`.
+    - Running `sed -i` without testing the expression first (no backup by default).
+    - Assuming GNU `-i` syntax works on macOS.
+  related: [awk, grep, tr]
+  portability: "`-i`, `-E` (now POSIX 2024), `\\w` and `I` are extensions. BSD sed needs `-i ''` for no backup."
+
+awk:
+  category: Text
+  origin: posix-utility
+  summary: A small programming language for processing records and fields.
+  why: >-
+    When text has columns — logs, CSV, command output — awk splits each line into fields automatically and lets you
+    filter, compute and aggregate with patterns, variables and associative arrays.
+  syntax:
+    - awk [-F SEP] [-v VAR=VAL] 'PROGRAM' [FILE]...
+    - "PROGRAM = pattern { action } ..."
+  flags:
+    - flag: -F SEP
+      description: Field separator (default is runs of whitespace).
+    - flag: -v VAR=VAL
+      description: Pass a shell value into an awk variable.
+    - flag: $1 $2 … $NF
+      description: Fields; `$0` is the whole line, `NF` the number of fields.
+    - flag: NR / FNR
+      description: Record number overall / within the current file.
+    - flag: BEGIN { } / END { }
+      description: Run before reading input / after all input.
+  examples:
+    - code: awk '{print $1}' logs/access.log | sort -u
+      description: The first field of each line — unique client IPs.
+    - code: awk '$9 >= 500 {print $7}' logs/access.log
+      description: Requested paths that returned server errors.
+    - code: awk -F, 'NR > 1 {sum += $4 * $5} END {printf "%.2f\n", sum}' data/sales.csv
+      description: Total revenue from a CSV.
+    - code: awk -F, 'NR>1 {units[$2] += $4} END {for (r in units) print r, units[r]}' data/sales.csv
+      description: Group-by with an associative array.
+  useCases:
+    - Log analysis; CSV reports; reformatting command output; quick calculations.
+  mistakes:
+    - Using double quotes around the program, letting the shell expand `$1`. Always single-quote awk programs.
+    - Splitting quoted CSV fields with `-F,` — fields containing commas need a real CSV parser.
+  related: [sed, cut, grep]
+  portability: "POSIX awk is everywhere; gawk adds functions like `strftime`, `gensub` and `PROCINFO`. macOS ships BWK awk."

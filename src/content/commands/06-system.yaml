@@ -1,0 +1,451 @@
+chmod:
+  category: System
+  origin: posix-utility
+  summary: Change file permission bits (read, write, execute for user, group, others).
+  why: >-
+    Permissions decide who can read secrets, modify files and run programs. A script must be executable to run as
+    `./script.sh`; private keys must not be readable by others.
+  syntax:
+    - chmod [-R] MODE FILE...
+  flags:
+    - flag: MODE (octal)
+      description: Three digits for user, group, other — r=4, w=2, x=1. E.g. 755, 644, 600.
+    - flag: MODE (symbolic)
+      description: "[ugoa][+-=][rwxX], e.g. u+x, go-w, a=r, u=rwx,go=rx."
+    - flag: -R
+      description: Apply recursively.
+  examples:
+    - code: chmod +x deploy.sh
+      description: Make a script executable.
+    - code: chmod 600 ~/.ssh/id_ed25519
+      description: Private key readable only by you (SSH refuses keys that are too open).
+    - code: chmod -R u=rwX,go=rX public/
+      description: Capital X adds execute only to directories (and already-executable files).
+  useCases:
+    - Making scripts executable; securing secrets; fixing web server file permissions.
+  mistakes:
+    - "`chmod -R 777` to \"fix\" permission errors — it makes everything writable by every user."
+    - Using `-R` with lowercase x, making every file executable.
+  related: [chown, ls, stat]
+
+chown:
+  category: System
+  origin: posix-utility
+  summary: Change file owner and group.
+  why: Services run as dedicated users (www-data, postgres); their files must belong to them. Usually requires root.
+  syntax:
+    - chown [-R] OWNER[:GROUP] FILE...
+  flags:
+    - flag: -R
+      description: Recursive.
+    - flag: OWNER:GROUP
+      description: Change both at once; `:GROUP` changes only the group.
+  examples:
+    - code: sudo chown -R www-data:www-data /var/www/html
+      description: Give a web root to the web server user.
+    - code: sudo chown "$USER": ~/project
+      description: Take ownership back (the trailing colon sets your login group).
+  useCases:
+    - Deployments; fixing files created by root; container volume permissions.
+  mistakes:
+    - Running `sudo chown -R` on the wrong path — there's no undo.
+  related: [chmod]
+
+ps:
+  category: System
+  origin: posix-utility
+  summary: Report a snapshot of running processes.
+  why: To find out what is running, its PID (for kill), and how much CPU and memory it uses.
+  syntax:
+    - ps aux        (BSD-style)
+    - ps -ef        (POSIX-style)
+    - ps -o pid,cmd -p PID
+  flags:
+    - flag: aux
+      description: All processes, with user and resource columns.
+    - flag: -ef
+      description: All processes, full format, including the parent PID.
+    - flag: -o FIELDS
+      description: Choose columns, e.g. `-o pid,ppid,%cpu,%mem,cmd`.
+    - flag: --sort=-%mem
+      description: Sort by memory, highest first (GNU procps).
+  examples:
+    - code: ps aux | grep '[n]ginx'
+      description: Find nginx processes (the bracket trick stops grep matching itself).
+    - code: ps -eo pid,%mem,cmd --sort=-%mem | head -5
+      description: Top memory users.
+  useCases:
+    - Finding PIDs; checking whether a service is running; resource troubleshooting.
+  mistakes:
+    - Parsing `ps | grep` output in scripts — use `pgrep`/`pkill` instead.
+  related: [kill, top]
+  portability: Real process listing requires a Linux/macOS system; the browser simulator lists only itself.
+
+kill:
+  category: System
+  origin: bash-builtin
+  summary: Send a signal to a process (by default SIGTERM, asking it to exit).
+  why: Stop runaway or hung programs, reload services (SIGHUP) and communicate with daemons.
+  syntax:
+    - kill [-SIGNAL] PID|%JOB...
+    - kill -l
+  flags:
+    - flag: -TERM (15)
+      description: Polite termination request — the default.
+    - flag: -INT (2)
+      description: Interrupt, like Ctrl+C.
+    - flag: -HUP (1)
+      description: Hang-up; many daemons reload their configuration on it.
+    - flag: -KILL (9)
+      description: Immediate, uncatchable termination — no cleanup happens.
+    - flag: -l
+      description: List signal names and numbers.
+  examples:
+    - code: kill 4242
+      description: Ask process 4242 to terminate.
+    - code: kill -HUP "$(cat /run/nginx.pid)"
+      description: Ask nginx to reload its configuration.
+    - code: |
+        kill "$pid"; sleep 5; kill -0 "$pid" 2>/dev/null && kill -9 "$pid"
+      description: Escalate only if the process ignores SIGTERM (`kill -0` tests existence).
+  useCases:
+    - Stopping processes; reloading daemons; testing signal handling in scripts.
+  mistakes:
+    - Reaching for `kill -9` first — the process gets no chance to flush data or remove lock files.
+  related: [ps, trap]
+
+top:
+  category: System
+  origin: linux-specific
+  summary: Live, sorted view of processes and system load.
+  why: The quickest answer to "why is this machine slow?" — CPU, memory and load average, updated every few seconds.
+  syntax:
+    - top [-b -n 1] [-o FIELD]
+  flags:
+    - flag: -b -n 1
+      description: Batch mode, one iteration — usable in scripts and logs.
+    - flag: (inside top) M / P
+      description: Sort by memory / CPU. `q` quits.
+  examples:
+    - code: top -b -n 1 | head -15
+      description: A one-shot snapshot for a report.
+  useCases:
+    - Live troubleshooting of CPU and memory pressure.
+  mistakes:
+    - Running interactive `top` in scripts; use batch mode.
+  related: [ps, free]
+
+df:
+  category: System
+  origin: posix-utility
+  summary: Report free and used space on mounted filesystems.
+  why: Full disks crash databases and stop logging. `df` tells you how full each filesystem is.
+  syntax:
+    - df [-h] [-T] [FILE]...
+  flags:
+    - flag: -h
+      description: Human-readable sizes.
+    - flag: -T
+      description: Show the filesystem type (GNU).
+    - flag: -i
+      description: Inode usage — a disk can be "full" of tiny files even with free bytes.
+  examples:
+    - code: df -h /
+      description: Space on the root filesystem.
+    - code: |
+        usage=$(df --output=pcent / | tail -1 | tr -dc 0-9)
+        (( usage > 90 )) && echo "disk almost full: ${usage}%"
+      description: Threshold check for monitoring (GNU `--output`).
+  useCases:
+    - Disk alerts; capacity planning; diagnosing write failures.
+  mistakes:
+    - Confusing `df` (filesystem level) with `du` (space used by specific files and directories).
+  related: [du, free]
+
+du:
+  category: System
+  origin: posix-utility
+  summary: Estimate disk space used by files and directories.
+  why: When `df` says the disk is full, `du` finds out what is using the space.
+  syntax:
+    - du [-sh] [-d N] [FILE]...
+  flags:
+    - flag: -s
+      description: Summary — one total per argument.
+    - flag: -h
+      description: Human-readable sizes.
+    - flag: -d N
+      description: Limit depth (`--max-depth=N`).
+    - flag: -a
+      description: Include files, not only directories.
+  examples:
+    - code: du -sh ~/*
+      description: Size of each item in your home directory.
+    - code: du -h -d 1 /var | sort -h | tail -5
+      description: The biggest directories under /var.
+  useCases:
+    - Hunting large directories; reporting space per project or user.
+  mistakes:
+    - Forgetting hidden directories — `du -sh *` skips `.cache` and friends. Use `du -sh .[!.]* *`.
+  related: [df, find, sort]
+
+free:
+  category: System
+  origin: linux-specific
+  summary: Show memory and swap usage.
+  why: Memory pressure causes slowness and OOM kills. `free` shows how much RAM is genuinely available.
+  syntax:
+    - free [-h] [-m]
+  flags:
+    - flag: -h
+      description: Human-readable units.
+  examples:
+    - code: free -h
+      description: Look at the **available** column, not **free** — Linux uses spare RAM for cache.
+  useCases:
+    - Health checks and capacity monitoring.
+  mistakes:
+    - Panicking because "free" is low — cached memory is released when needed.
+  related: [top, df]
+  portability: Linux only (reads /proc/meminfo). macOS uses `vm_stat`.
+
+systemctl:
+  category: System
+  origin: linux-specific
+  summary: Control systemd services and the system state.
+  why: Most Linux distributions use systemd to start, stop and supervise services. `systemctl` is its control tool.
+  syntax:
+    - systemctl {start|stop|restart|reload|status|enable|disable} UNIT
+    - systemctl list-units --failed
+  flags:
+    - flag: status UNIT
+      description: Whether it's running, its PID and the latest log lines.
+    - flag: enable --now UNIT
+      description: Start at boot and start now.
+    - flag: is-active UNIT
+      description: Exit status 0 if running — handy in scripts.
+    - flag: daemon-reload
+      description: Reload unit files after editing them.
+  examples:
+    - code: sudo systemctl restart nginx
+      description: Restart a service.
+    - code: systemctl is-active --quiet nginx || echo "nginx is down"
+      description: Script-friendly health check.
+    - code: systemctl list-units --type=service --state=failed
+      description: What has failed?
+  useCases:
+    - Service management; health checks; boot configuration.
+  mistakes:
+    - Editing a unit file and forgetting `systemctl daemon-reload`.
+  related: [journalctl, ps]
+  portability: Linux with systemd only (not macOS, not most containers).
+
+journalctl:
+  category: System
+  origin: linux-specific
+  summary: Query the systemd journal (system and service logs).
+  why: systemd collects logs from every service in one place; journalctl filters them by unit, time and priority.
+  syntax:
+    - journalctl [-u UNIT] [-f] [--since TIME] [-p PRIORITY]
+  flags:
+    - flag: -u UNIT
+      description: Logs of one service.
+    - flag: -f
+      description: Follow new entries.
+    - flag: --since / --until
+      description: Time window, e.g. `--since '1 hour ago'`.
+    - flag: -p err
+      description: Only errors and worse.
+    - flag: -b
+      description: Since the last boot.
+  examples:
+    - code: journalctl -u nginx --since today
+      description: Today's nginx logs.
+    - code: journalctl -p err -b --no-pager
+      description: All errors since boot, printed (not paged).
+  useCases:
+    - Debugging failing services; auditing boot problems.
+  mistakes:
+    - Forgetting `--no-pager` in scripts.
+  related: [systemctl]
+  portability: Linux with systemd only.
+
+crontab:
+  category: System
+  origin: posix-utility
+  summary: Edit and list scheduled jobs for the cron daemon.
+  why: Cron runs commands on a schedule — backups at night, reports every Monday, cleanup every hour.
+  syntax:
+    - crontab -e
+    - crontab -l
+    - "MIN HOUR DOM MON DOW command"
+  flags:
+    - flag: -e
+      description: Edit your crontab.
+    - flag: -l
+      description: List it.
+    - flag: -r
+      description: Remove it (careful — next to -e on the keyboard!).
+  examples:
+    - code: 30 2 * * * /home/learner/bin/backup.sh >> /home/learner/backup.log 2>&1
+      description: Every day at 02:30, logging output and errors.
+    - code: "*/15 * * * * /usr/local/bin/healthcheck.sh"
+      description: Every 15 minutes.
+  useCases:
+    - Backups, reports, cleanup, certificate renewal.
+  mistakes:
+    - Relying on your interactive PATH and aliases — cron has a minimal environment. Use absolute paths.
+    - Not redirecting output; cron mails it (or discards it), so failures go unnoticed.
+    - Using `%` unescaped — in crontab lines `%` means newline. Write `\%` (e.g. in `date +\%F`).
+  related: [systemctl]
+
+tar:
+  category: System
+  origin: posix-utility
+  summary: Create and extract archives, optionally compressed.
+  why: The standard way to bundle directories into one file for backups, transfers and releases.
+  syntax:
+    - tar -czf ARCHIVE.tar.gz FILES...
+    - tar -xzf ARCHIVE.tar.gz [-C DIR]
+    - tar -tzf ARCHIVE.tar.gz
+  flags:
+    - flag: -c / -x / -t
+      description: Create / extract / list.
+    - flag: -z / -j / -J
+      description: gzip / bzip2 / xz compression.
+    - flag: -f FILE
+      description: Archive file name (must come right after f).
+    - flag: -C DIR
+      description: Change to DIR first.
+    - flag: --exclude=PATTERN
+      description: Skip matching files.
+  examples:
+    - code: tar -czf "backup-$(date +%F).tar.gz" -C ~ projects
+      description: Compressed backup of ~/projects, stored with relative paths.
+    - code: tar -tzf backup.tar.gz | head
+      description: Inspect before extracting.
+    - code: tar -xzf release.tar.gz -C /opt/app
+      description: Extract into a specific directory.
+  useCases:
+    - Backups; packaging releases; moving directory trees between machines.
+  mistakes:
+    - Archiving absolute paths, which then extract to the same absolute locations. Use `-C`.
+    - Extracting untrusted archives without listing them first.
+  related: [rsync, find]
+
+ssh:
+  category: Network
+  origin: external-tool
+  summary: Open a secure shell on a remote machine, or run a single command there.
+  why: Servers are administered remotely. SSH encrypts the connection and authenticates with keys.
+  syntax:
+    - ssh [-p PORT] [-i KEY] USER@HOST [COMMAND]
+  flags:
+    - flag: -i KEY
+      description: Identity (private key) file.
+    - flag: -p PORT
+      description: Port (default 22).
+    - flag: -o BatchMode=yes
+      description: Never prompt — fail instead (essential in scripts).
+    - flag: -J JUMP
+      description: Connect through a bastion host.
+  examples:
+    - code: ssh deploy@web01 'uptime'
+      description: Run one command remotely.
+    - code: ssh -o BatchMode=yes -o ConnectTimeout=5 web01 true && echo reachable
+      description: Script-safe connectivity check.
+    - code: ssh web01 'bash -s' < local-script.sh
+      description: Run a local script on a remote host.
+  useCases:
+    - Remote administration; running commands across fleets; tunnelling.
+  mistakes:
+    - Double-quoting remote commands so variables expand locally instead of on the server.
+    - Interactive prompts hanging automation — always use BatchMode in scripts.
+  related: [scp, rsync]
+
+scp:
+  category: Network
+  origin: external-tool
+  summary: Copy files to or from a remote machine over SSH.
+  why: The simplest secure file transfer for occasional copies.
+  syntax:
+    - scp [-r] [-P PORT] SOURCE... USER@HOST:DEST
+  flags:
+    - flag: -r
+      description: Copy directories recursively.
+    - flag: -P PORT
+      description: Port (capital P, unlike ssh).
+  examples:
+    - code: scp backup.tar.gz deploy@web01:/srv/backups/
+      description: Upload a file.
+    - code: scp web01:/var/log/nginx/error.log .
+      description: Download a file into the current directory.
+  useCases:
+    - One-off transfers of configs, logs and artefacts.
+  mistakes:
+    - Using scp for large or repeated syncs — rsync transfers only differences and can resume.
+  related: [ssh, rsync]
+
+rsync:
+  category: Network
+  origin: external-tool
+  summary: Efficiently synchronise files locally or over SSH, transferring only differences.
+  why: Backups and deployments copy the same trees again and again; rsync sends only what changed and preserves metadata.
+  syntax:
+    - rsync -avz [--delete] [--exclude PAT] SRC/ DEST/
+  flags:
+    - flag: -a
+      description: Archive — recursive, preserve permissions, times, links.
+    - flag: -v / -z
+      description: Verbose / compress during transfer.
+    - flag: --delete
+      description: Delete files in DEST that no longer exist in SRC (true mirror).
+    - flag: -n
+      description: Dry run — show what would happen.
+    - flag: --exclude=PAT
+      description: Skip matching files.
+  examples:
+    - code: rsync -avn --delete ~/projects/ /backup/projects/
+      description: Preview a mirror before running it.
+    - code: rsync -az --delete build/ deploy@web01:/srv/app/releases/42/
+      description: Deploy a build to a server.
+  useCases:
+    - Backups; deployments; migrating data between machines.
+  mistakes:
+    - "Trailing slash semantics: `src/` copies the contents, `src` copies the directory itself."
+    - Running `--delete` without a dry run first.
+  related: [scp, cp, ssh]
+
+curl:
+  category: Network
+  origin: external-tool
+  summary: Transfer data from or to URLs (HTTP, HTTPS and more).
+  why: Health checks, API calls, downloads and webhooks from scripts and CI pipelines.
+  syntax:
+    - curl [-fsSL] [-o FILE] [-X METHOD] [-H HEADER] [-d DATA] URL
+  flags:
+    - flag: -f
+      description: Fail (non-zero exit) on HTTP errors like 404/500 — vital in scripts.
+    - flag: -sS
+      description: Silent, but still show errors.
+    - flag: -L
+      description: Follow redirects.
+    - flag: -o FILE
+      description: Save output to a file.
+    - flag: -w '%{http_code}'
+      description: Print the HTTP status code.
+    - flag: --retry N
+      description: Retry transient failures.
+  examples:
+    - code: curl -fsS https://example.com/health
+      description: A health check that fails properly.
+    - code: |
+        code=$(curl -s -o /dev/null -w '%{http_code}' https://example.com)
+        [[ $code == 200 ]] || echo "unexpected status $code"
+      description: Check the status code.
+  useCases:
+    - Monitoring endpoints; calling APIs; downloading release artefacts in CI.
+  mistakes:
+    - Omitting `-f` — curl exits 0 even on a 500 page, so scripts think it worked.
+    - "`curl URL | bash` from untrusted sources."
+  related: [ssh]

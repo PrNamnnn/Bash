@@ -1,0 +1,436 @@
+cat:
+  category: Viewing
+  origin: posix-utility
+  summary: Concatenate files and print them to standard output.
+  why: >-
+    Its name comes from "concatenate": joining several files into one stream. It's also the quickest way to dump a
+    small file to the screen or feed it into a pipeline.
+  syntax:
+    - cat [-n] [-A] [FILE]...
+  flags:
+    - flag: -n
+      description: Number all output lines.
+    - flag: -A
+      description: "Show invisible characters: `$` at line ends, `^I` for tabs, `^M` for Windows carriage returns (GNU)."
+    - flag: -s
+      description: Squeeze runs of blank lines into one.
+  examples:
+    - code: cat notes.txt
+      description: Print a file.
+    - code: cat part1.txt part2.txt > whole.txt
+      description: Join files into a new one.
+    - code: cat -A script.sh | head -3
+      description: Spot hidden `^M` characters that cause "bad interpreter" errors.
+  useCases:
+    - Reading short files; combining files; supplying input to a pipeline.
+  mistakes:
+    - "Useless use of cat: `cat file | grep x` works, but `grep x file` is simpler and one process cheaper."
+    - Using `cat` on huge files — use `less`, `head` or `tail` instead.
+  related: [tac, nl, head]
+
+tac:
+  category: Viewing
+  origin: gnu-coreutils
+  summary: Print files with the lines in reverse order (cat backwards).
+  why: Logs grow at the bottom; reversing them shows the newest entries first.
+  syntax:
+    - tac [FILE]...
+  examples:
+    - code: tac logs/app.log | head -3
+      description: The three most recent log lines, newest first.
+  useCases:
+    - Reading logs newest-first; reversing ordered output.
+  mistakes:
+    - Expecting it on macOS — use `tail -r` there.
+  related: [cat, tail, sort]
+  portability: GNU only. macOS has `tail -r`.
+
+nl:
+  category: Viewing
+  origin: posix-utility
+  summary: Number the lines of a file.
+  why: Line numbers make it easy to refer to specific lines in discussions, reviews and error messages.
+  syntax:
+    - nl [-ba] [FILE]...
+  flags:
+    - flag: -ba
+      description: Number all lines, including blank ones (default numbers non-empty lines only).
+    - flag: -w N
+      description: Width of the number column.
+  examples:
+    - code: nl notes.txt
+      description: Number non-blank lines.
+    - code: nl -ba projects/scripts/broken.sh
+      description: Number every line of a script before debugging it.
+  useCases:
+    - Preparing code listings; matching error messages that mention line numbers.
+  mistakes:
+    - Being surprised that blank lines are skipped; use `-ba` or `cat -n`.
+  related: [cat]
+
+head:
+  category: Viewing
+  origin: posix-utility
+  summary: Print the first lines (or bytes) of files.
+  why: Look at the start of a large file — headers, the first log entries, a sample of data — without reading it all.
+  syntax:
+    - head [-n N] [FILE]...
+  flags:
+    - flag: -n N
+      description: First N lines (default 10). `-N` is a shorthand.
+    - flag: -n -N
+      description: Everything except the last N lines (GNU).
+    - flag: -c N
+      description: First N bytes.
+  examples:
+    - code: head -n 3 data/sales.csv
+      description: The header and two rows.
+    - code: sort -nr data/numbers.txt | head -1
+      description: The largest number — `head` is the natural end of "top N" pipelines.
+  useCases:
+    - Peeking at data files; "top N" reports; reading CSV headers.
+  mistakes:
+    - Forgetting `head` stops reading early; upstream commands may receive SIGPIPE. That's normal and usually harmless.
+  related: [tail, wc]
+
+tail:
+  category: Viewing
+  origin: posix-utility
+  summary: Print the last lines of files, or follow a file as it grows.
+  why: Logs append at the end; `tail` shows the latest events and `tail -f` streams new ones live.
+  syntax:
+    - tail [-n N] [-f] [FILE]...
+  flags:
+    - flag: -n N
+      description: Last N lines (default 10).
+    - flag: -n +N
+      description: Everything starting from line N — handy for skipping a header (`tail -n +2`).
+    - flag: -f
+      description: Follow — keep printing new lines as they are appended (Ctrl+C to stop).
+    - flag: -F
+      description: Follow by name, surviving log rotation (GNU).
+  examples:
+    - code: tail -n 5 logs/app.log
+      description: The latest five entries.
+    - code: tail -n +2 data/sales.csv | wc -l
+      description: Count data rows, skipping the CSV header.
+    - code: tail -f /var/log/syslog | grep --line-buffered error
+      description: Watch a live log for errors (on a real system).
+  useCases:
+    - Monitoring services in real time; skipping headers; reading recent entries.
+  mistakes:
+    - Using `tail -f` in scripts without a way to stop it.
+  related: [head, less, tac]
+
+wc:
+  category: Viewing
+  origin: posix-utility
+  summary: Count lines, words and bytes.
+  why: Counting is the simplest form of analysis — how many requests, errors, users, files.
+  syntax:
+    - wc [-lwcm] [FILE]...
+  flags:
+    - flag: -l
+      description: Lines (strictly, newline characters).
+    - flag: -w
+      description: Words.
+    - flag: -c
+      description: Bytes.
+    - flag: -m
+      description: Characters (differs from bytes for UTF-8 text).
+  examples:
+    - code: wc -l logs/access.log
+      description: Number of requests in the log (one per line).
+    - code: wc -l < logs/access.log
+      description: Redirecting input prints just the number — ideal for `$(...)`.
+    - code: grep -c ERROR logs/app.log
+      description: For counting matches, `grep -c` beats `grep | wc -l`.
+  useCases:
+    - Sizing data; counting matches; quick sanity checks in scripts.
+  mistakes:
+    - A last line without a trailing newline is not counted by `wc -l`.
+    - "`wc -l file` prints the name too; use `< file` when you only want the number."
+  related: [grep, sort, uniq]
+
+less:
+  category: Viewing
+  origin: external-tool
+  summary: Page through text one screen at a time, with search.
+  why: For files longer than your screen, `less` lets you scroll and search without loading the whole file into the terminal.
+  syntax:
+    - less [-N] [-S] [+F] FILE
+  flags:
+    - flag: -N
+      description: Show line numbers.
+    - flag: -S
+      description: Chop long lines instead of wrapping.
+    - flag: +F
+      description: Start in follow mode, like `tail -f` (Ctrl+C to stop following).
+  examples:
+    - code: less /var/log/syslog
+      description: Space/b to page, /pattern to search, n for next match, G for end, q to quit.
+    - code: journalctl -u nginx | less
+      description: Page any command's output.
+  useCases:
+    - Reading logs and man pages; searching large outputs interactively.
+  mistakes:
+    - Using `less` in scripts — it is interactive. Use `cat`, `head` or `tail` in automation.
+  related: [more, cat, tail]
+  portability: Interactive pager; not available in this browser simulator.
+
+more:
+  category: Viewing
+  origin: posix-utility
+  summary: The original, simpler pager.
+  why: Present on almost every Unix system, including minimal ones where `less` is missing.
+  syntax:
+    - more FILE
+  examples:
+    - code: more notes.txt
+      description: Space for the next page, q to quit.
+  useCases:
+    - Paging output on minimal systems.
+  mistakes:
+    - Expecting backwards scrolling and rich search — that's what `less` adds ("less is more").
+  related: [less, cat]
+
+find:
+  category: Searching
+  origin: posix-utility
+  summary: Walk a directory tree and select files by name, type, size, time, permissions — then act on them.
+  why: >-
+    The shell's globs only look in one directory and only match names. `find` searches recursively with rich tests and
+    can run a command on every match, making it the backbone of cleanup, audit and batch-processing scripts.
+  syntax:
+    - find [PATH...] [EXPRESSION]
+  flags:
+    - flag: -name PATTERN
+      description: Match the file name against a glob (quote it!). `-iname` ignores case.
+    - flag: -type f|d
+      description: Regular files or directories.
+    - flag: -size +10M
+      description: Larger than 10 MiB (`-` for smaller; c/k/M/G units).
+    - flag: -mtime +7
+      description: Modified more than 7 days ago (`-7` = within 7 days). `-mmin` uses minutes.
+    - flag: -maxdepth N
+      description: Don't descend more than N levels.
+    - flag: -path PATTERN
+      description: Match the whole path; combine with `-prune` to skip directories.
+    - flag: -exec CMD {} \;
+      description: Run CMD once per match, `{}` replaced by the path.
+    - flag: -exec CMD {} +
+      description: Run CMD with many paths at once (much faster).
+    - flag: -delete
+      description: Delete matches (put it last, test with -print first).
+    - flag: -print0
+      description: NUL-separated output, safe for any file name (pair with `xargs -0`).
+  examples:
+    - code: find . -name '*.log'
+      description: All .log files below the current directory.
+    - code: find /var/log -type f -mtime +30 -name '*.gz'
+      description: Compressed logs older than 30 days.
+    - code: find ~/projects -type f -name '*.sh' -exec chmod +x {} +
+      description: Make every script executable in one command.
+    - code: find . -type f -size +100M -printf '%s %p\n' | sort -nr | head
+      description: The largest files (GNU `-printf`).
+    - code: find /tmp -type f -mtime +7 -print -delete
+      description: Show and delete week-old temp files.
+  useCases:
+    - Cleanup jobs; finding large or old files; applying a change to many files; security audits (e.g. world-writable files).
+  mistakes:
+    - Not quoting the pattern — `find . -name *.txt` lets the shell expand the glob first.
+    - Putting `-delete` before the tests — `find . -delete -name x` deletes everything.
+    - Piping `find` into `xargs` without `-print0`/`-0` breaks on spaces and newlines in names.
+  related: [ls, xargs, grep]
+  portability: "`-printf`, `-maxdepth`, `-delete` and `-iname` are GNU/BSD extensions, widely available but not POSIX."
+
+which:
+  category: Searching
+  origin: external-tool
+  summary: Show which executable file a command name resolves to through PATH.
+  why: When several versions of a program are installed, `which` tells you which one runs.
+  syntax:
+    - which [-a] NAME...
+  flags:
+    - flag: -a
+      description: Show every match in PATH, not just the first.
+  examples:
+    - code: which grep
+      description: The path of the grep program.
+      output: /usr/bin/grep
+    - code: which -a python3
+      description: Find duplicate installations shadowing each other.
+  useCases:
+    - Debugging "wrong version" problems; checking whether a tool is installed.
+  mistakes:
+    - "`which` only knows about files in PATH — it can't see aliases, functions or builtins. Use `type` or `command -v` in Bash."
+  related: [type, command, whereis]
+
+whereis:
+  category: Searching
+  origin: linux-specific
+  summary: Locate the binary, source and manual page files for a command.
+  why: Shows where a program and its documentation are installed.
+  syntax:
+    - whereis NAME...
+  examples:
+    - code: whereis ls
+      description: Binary and man page locations.
+  useCases:
+    - Finding manual pages or alternate binaries.
+  mistakes:
+    - Treating it as authoritative for what runs — it searches fixed locations, not your PATH order.
+  related: [which, type]
+
+type:
+  category: Searching
+  origin: bash-builtin
+  summary: Explain how Bash would interpret a command name — alias, keyword, function, builtin or file.
+  why: >-
+    The same name can mean different things (an alias `ls`, a function `deploy`, a builtin `echo`, a program
+    `/usr/bin/echo`). `type` reveals exactly what will run, in Bash's lookup order.
+  syntax:
+    - type [-a] [-t] [-P] NAME...
+  flags:
+    - flag: -a
+      description: Show all matches, not just the one that wins.
+    - flag: -t
+      description: Print just the kind — alias, keyword, function, builtin or file.
+    - flag: -P
+      description: Force a PATH search, returning the file path.
+  examples:
+    - code: type cd ls if ll
+      description: Four different kinds of command names.
+      output: |
+        cd is a shell builtin
+        ls is /usr/bin/ls
+        if is a shell keyword
+        ll is aliased to `ls -alF'
+    - code: type -a echo
+      description: Both the builtin and the external program exist; the builtin wins.
+  useCases:
+    - Debugging why a command behaves unexpectedly (an alias or function may be shadowing it).
+    - Checking dependencies in scripts with `type -P git >/dev/null`.
+  mistakes:
+    - Using `which` instead, which can't see aliases, functions or builtins.
+  related: [command, which]
+
+command:
+  category: Searching
+  origin: bash-builtin
+  summary: Run a command while bypassing aliases and functions, or test whether a command exists.
+  why: >-
+    `command -v NAME` is the POSIX-standard way to check if a program is available. `command NAME` runs the real
+    program even when a function or alias of the same name exists.
+  syntax:
+    - command [-v | -V] NAME
+    - command NAME [ARGS]...
+  flags:
+    - flag: -v
+      description: Print how NAME resolves (path, or name for builtins); exit 1 if not found.
+    - flag: -V
+      description: Verbose description, like `type`.
+  examples:
+    - code: |
+        if ! command -v jq >/dev/null 2>&1; then
+          echo "jq is required" >&2
+          exit 1
+        fi
+      description: The standard dependency check at the top of a script.
+    - code: |
+        ls() { command ls --color=auto "$@"; }
+      description: A wrapper function that calls the real `ls` without recursing into itself.
+  useCases:
+    - Checking prerequisites in portable scripts.
+    - Writing wrapper functions.
+  mistakes:
+    - Using `which` for dependency checks; it's not POSIX and its exit status varies between systems.
+  related: [type, which]
+  portability: "`command -v` is POSIX and works in sh, dash, Bash and zsh."
+
+grep:
+  category: Searching
+  origin: posix-utility
+  summary: Print lines that match a pattern.
+  why: >-
+    Finding the relevant few lines in a large file or codebase is one of the most common things you do in a terminal.
+    `grep` filters text with regular expressions and is the first stage of countless pipelines.
+  syntax:
+    - grep [OPTION]... PATTERN [FILE]...
+    - grep [OPTION]... -e PATTERN ... [FILE]...
+  flags:
+    - flag: -i
+      description: Ignore case.
+    - flag: -v
+      description: Invert — print lines that do NOT match.
+    - flag: -n
+      description: Prefix each line with its line number.
+    - flag: -c
+      description: Print only a count of matching lines.
+    - flag: -r / -R
+      description: Search directories recursively.
+    - flag: -l / -L
+      description: List only file names that match / don't match.
+    - flag: -w
+      description: Match whole words only.
+    - flag: -x
+      description: Match whole lines only.
+    - flag: -E
+      description: Extended regular expressions (`+ ? | ( )` without backslashes).
+    - flag: -F
+      description: Fixed strings — no regex metacharacters; fastest.
+    - flag: -o
+      description: Print only the matching part of each line.
+    - flag: -q
+      description: Quiet — print nothing; just set the exit status (perfect for `if`).
+    - flag: -A N / -B N / -C N
+      description: Show N lines After / Before / around each match.
+  examples:
+    - code: grep ERROR logs/app.log
+      description: Lines containing ERROR.
+    - code: grep -in 'timeout' logs/*.log
+      description: Case-insensitive, with file names and line numbers.
+    - code: grep -rn --include='*.sh' 'set -e' ~/projects
+      description: Search a code tree, only in shell scripts.
+    - code: |
+        if grep -q '^learner:' /etc/passwd; then echo "user exists"; fi
+      description: Use the exit status in a condition.
+    - code: grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' logs/access.log | sort -u
+      description: Extract unique IP addresses.
+  useCases:
+    - Searching logs and code; filtering pipeline output; validating input; checking configuration.
+  mistakes:
+    - Forgetting to quote the pattern — `grep *.txt` lets the shell expand the glob.
+    - Treating `.` as a literal dot — in a regex it matches any character. Escape it or use `-F`.
+    - "`grep -c` counts matching lines, not matches; a line with two matches counts once."
+  related: [find, sed, awk, wc]
+  portability: "`-r`, `-o`, `-w`, `--include` and `-P` are GNU/BSD extensions. `-P` (Perl regex) is not available in macOS grep."
+
+locate:
+  category: Searching
+  origin: external-tool
+  summary: Find files by name instantly using a prebuilt database.
+  why: >-
+    Walking a whole disk with `find` can take minutes. `locate` searches a database (built nightly by `updatedb`)
+    and answers in milliseconds.
+  syntax:
+    - locate [-i] [-c] [-b] PATTERN
+  flags:
+    - flag: -i
+      description: Ignore case.
+    - flag: -c
+      description: Only print the number of matches.
+    - flag: -b
+      description: Match only the base name, not the whole path.
+  examples:
+    - code: locate sshd_config
+      description: Where is the SSH server configuration?
+    - code: sudo updatedb && locate -b '\nginx.conf'
+      description: Refresh the database, then match the exact base name.
+  useCases:
+    - Quickly finding where a package installed its files.
+  mistakes:
+    - Trusting results for files created after the last `updatedb` run — they won't be there.
+    - Expecting it on minimal systems; install `plocate` or `mlocate` first.
+  related: [find, which]
+  portability: Not installed by default on many distributions and not available in this simulator.

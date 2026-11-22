@@ -1,0 +1,607 @@
+# Practice challenges. One YAML document per challenge, separated by ---.
+# Fields: id, title, difficulty, topic, lesson (optional), then the exercise fields.
+id: count-lines
+title: How long is that file?
+difficulty: beginner
+topic: Text tools
+lesson: head-tail-wc
+kind: command
+prompt: "Print just the number of lines in `~/notes.txt` — no file name after it."
+solution: wc -l < ~/notes.txt
+hints:
+  - "`wc -l FILE` prints the name too. How can wc read the file without knowing its name?"
+explanation: "Redirecting the file to stdin (`< file`) means wc has no name to print."
+---
+id: newest-file
+title: The newest file
+difficulty: beginner
+topic: Files
+lesson: listing-and-navigating
+kind: command
+prompt: "Print the name of the most recently modified entry in `~/logs` (one name only)."
+solution: ls -t ~/logs | head -n 1
+hints:
+  - "`ls -t` sorts by modification time, newest first."
+explanation: "`ls -t | head -n 1` is fine for a quick look; scripts that must handle odd names should use `find -printf` or a glob loop with `-nt`."
+---
+id: quote-predict
+title: Spot the splitting
+difficulty: beginner
+topic: Quoting
+lesson: quoting
+kind: predict
+prompt: What does this print?
+code: |
+  msg="two   spaces"
+  echo $msg
+  echo "$msg"
+answer: |
+  two spaces
+  two   spaces
+explanation: Unquoted, the value is split into words and echo joins them with single spaces. Quoted, it stays exactly as stored.
+---
+id: exit-status-mcq
+title: What does 0 mean?
+difficulty: beginner
+topic: Exit status
+lesson: exit-status
+kind: mcq
+prompt: "`grep -q error app.log` prints nothing. Afterwards `$?` is `0`. What does that mean?"
+options:
+  - grep failed
+  - The file contains at least one line matching error
+  - The file is empty
+  - grep found no matches
+answer: 1
+explanation: "Exit status 0 means success; for grep that means at least one match. 1 means no match, 2 means an error."
+---
+id: unique-regions
+title: Which regions?
+difficulty: beginner
+topic: Text tools
+lesson: cut-paste-tr
+kind: command
+prompt: "Print each distinct region in `~/data/sales.csv` (column 2) once, sorted alphabetically, without the header."
+solution: tail -n +2 ~/data/sales.csv | cut -d, -f2 | sort -u
+hints:
+  - "`tail -n +2` starts at line 2."
+  - "`sort -u` sorts and removes duplicates."
+explanation: "Skip the header, cut the field, sort unique — a pattern you'll use constantly."
+---
+id: fix-the-test
+title: The broken comparison
+difficulty: beginner
+topic: Conditionals
+lesson: if-statements
+kind: find-bug
+prompt: This script should print `big` for numbers over 100 but prints nothing for 9 and `big` for 50. Which line is wrong?
+code: |
+  #!/usr/bin/env bash
+  n=$1
+  if [ "$n" > 100 ]; then
+    echo big
+  fi
+answer: 3
+fix: |
+  if [ "$n" -gt 100 ]; then
+hints:
+  - "Inside `[ ]`, what does `>` mean to the shell?"
+explanation: "`>` is a redirection here: it creates a file named 100 and the test checks only that `$n` is non-empty. Use `-gt` (or `(( n > 100 ))`)."
+---
+id: brace-fill
+title: Many directories at once
+difficulty: beginner
+topic: Expansion
+lesson: brace-and-tilde-expansion
+kind: fill
+prompt: "Create `src`, `tests` and `docs` inside `project/` with a single mkdir command."
+template: mkdir -p project/___
+blanks:
+  - ["{src,tests,docs}", "{src,docs,tests}", "{tests,src,docs}", "{tests,docs,src}", "{docs,src,tests}", "{docs,tests,src}"]
+explanation: Brace expansion generates the three paths before mkdir runs.
+---
+id: largest-numbers
+title: Top three
+difficulty: beginner
+topic: Text tools
+lesson: sort-and-uniq
+kind: command
+prompt: "Print the three largest numbers in `~/data/numbers.txt`, largest first, one per line."
+solution: sort -rn ~/data/numbers.txt | head -n 3
+hints:
+  - "Plain `sort` compares text: 100 sorts before 7. Which option compares numbers?"
+explanation: "`-n` sorts numerically, `-r` reverses."
+---
+id: error-modules
+title: Who is failing?
+difficulty: intermediate
+topic: Log analysis
+lesson: log-parsing
+kind: command
+prompt: "From `~/logs/app.log`, print each module (the bracketed word, without brackets) that logged at least one ERROR, with its count, as `uniq -c` output, most errors first."
+solution: grep ' ERROR ' ~/logs/app.log | awk '{print $3}' | tr -d '[]' | sort | uniq -c | sort -rn
+hints:
+  - "The level is field 2 and the module field 3."
+  - "`tr -d '[]'` removes the brackets."
+explanation: "Filter, extract, normalise, count, rank — the canonical log pipeline."
+---
+id: sed-config
+title: Change a setting
+difficulty: intermediate
+topic: sed
+lesson: sed-stream-editing
+kind: command
+prompt: "Print `~/.config/app.conf` with the `port` value changed to `9090` (don't modify the file)."
+solution: sed 's/^port=.*/port=9090/' ~/.config/app.conf
+hints:
+  - "Anchor the pattern to the start of the line so `export_port=` wouldn't match."
+explanation: "Anchored substitution replaces the whole value whatever it was."
+---
+id: awk-average
+title: Average order size
+difficulty: intermediate
+topic: awk
+lesson: awk-fundamentals
+kind: command
+prompt: "Print the average of the `units` column (column 4) of `~/data/sales.csv`, skipping the header, with two decimals."
+solution: awk -F, 'NR > 1 { s += $4; n++ } END { printf "%.2f\n", s / n }' ~/data/sales.csv
+hints:
+  - "Accumulate a sum and a count, divide in END."
+explanation: "awk keeps state across lines, so aggregates take one pass."
+---
+id: subshell-predict
+title: Where did my variable go?
+difficulty: intermediate
+topic: Subshells
+lesson: subshells
+kind: predict
+prompt: What does this print?
+code: |
+  count=0
+  printf 'a\nb\nc\n' | while read -r line; do count=$((count + 1)); done
+  echo "pipe: $count"
+  while read -r line; do count=$((count + 1)); done < <(printf 'a\nb\nc\n')
+  echo "procsub: $count"
+answer: |
+  pipe: 0
+  procsub: 3
+explanation: The piped loop runs in a subshell, so its count is discarded; with process substitution the loop runs in the current shell.
+---
+id: param-expansion-fill
+title: Strip the extension
+difficulty: intermediate
+topic: Parameter expansion
+lesson: parameter-expansion
+kind: fill
+prompt: "Given `f=report.final.pdf`, print `report.final` without calling any external command."
+template: echo "___"
+blanks:
+  - ["${f%.*}"]
+explanation: "`%` removes the shortest suffix matching `.*` — just the last extension."
+---
+id: array-loop
+title: Safe list of files
+difficulty: intermediate
+topic: Arrays
+lesson: indexed-arrays
+kind: script
+prompt: "Collect all `.txt` files directly in `~/downloads` into an array (names may contain spaces), then print `N text file(s):` followed by each name on its own line, prefixed with `- `."
+starter: |
+  #!/usr/bin/env bash
+  cd ~/downloads
+solution: |
+  #!/usr/bin/env bash
+  cd ~/downloads
+  shopt -s nullglob
+  files=(*.txt)
+  echo "${#files[@]} text file(s):"
+  printf -- '- %s\n' "${files[@]}"
+expectedOutput: |
+  1 text file(s):
+  - notes (copy).txt
+checks:
+  - pattern: \bls\b
+    forbid: true
+    message: Use a glob, not ls.
+hints:
+  - "`files=(*.txt)` stores each match as one element."
+  - "`printf` repeats its format for every argument."
+explanation: "A glob into an array is the safe way to hold file names — spaces and all."
+---
+id: case-dispatch
+title: A tiny dispatcher
+difficulty: intermediate
+topic: case
+lesson: case-statements
+kind: script
+prompt: "Write `svc ACTION` that prints `starting`, `stopping` or `status: running` for `start`, `stop` and `status`, and for anything else prints `usage: svc start|stop|status` to stderr and returns 2. The test calls are given."
+starter: |
+  #!/usr/bin/env bash
+  svc() {
+    :
+  }
+  svc start
+  svc status
+  svc reboot 2>&1; echo "rc=$?"
+solution: |
+  #!/usr/bin/env bash
+  svc() {
+    case ${1:-} in
+      start)  echo starting ;;
+      stop)   echo stopping ;;
+      status) echo "status: running" ;;
+      *)      echo "usage: svc start|stop|status" >&2; return 2 ;;
+    esac
+  }
+  svc start
+  svc status
+  svc reboot 2>&1; echo "rc=$?"
+expectedOutput: |
+  starting
+  status: running
+  usage: svc start|stop|status
+  rc=2
+checks:
+  - pattern: \bcase\b
+    message: Use a case statement.
+hints:
+  - "The `*)` branch catches everything else."
+explanation: "case is the idiomatic dispatcher for subcommands."
+---
+id: getopts-predict
+title: Parsing options
+difficulty: intermediate
+topic: getopts
+lesson: getopts
+kind: predict
+prompt: What does this print?
+code: |
+  set -- -vf out.txt input.csv
+  v=0 f=""
+  while getopts 'vf:' o; do
+    case $o in v) v=1 ;; f) f=$OPTARG ;; esac
+  done
+  shift $((OPTIND - 1))
+  echo "v=$v f=$f rest=$*"
+answer: v=1 f=out.txt rest=input.csv
+explanation: "getopts splits the combined `-vf`, takes `out.txt` as f's argument, and OPTIND points at input.csv."
+---
+id: trap-cleanup
+title: Always clean up
+difficulty: intermediate
+topic: Signals and traps
+lesson: signals-and-trap
+kind: script
+prompt: "Create a temporary directory, register an EXIT trap that removes it and prints `cleaned`, create a file inside it, print `working`, and then fail with `false || exit 3`. The trap must still run."
+starter: |
+  #!/usr/bin/env bash
+solution: |
+  #!/usr/bin/env bash
+  tmp=$(mktemp -d)
+  trap 'rm -rf -- "$tmp"; echo cleaned' EXIT
+  touch "$tmp/data"
+  echo working
+  false || exit 3
+expectedOutput: |
+  working
+  cleaned
+checks:
+  - pattern: trap .*EXIT
+    message: Use an EXIT trap.
+  - pattern: mktemp
+    message: Create the directory with mktemp.
+hints:
+  - "Single-quote the trap so `$tmp` is expanded when the trap runs."
+explanation: "The EXIT trap runs on every way out of the script, including exit with an error status."
+---
+id: errexit-gotcha
+title: The silent counter
+difficulty: intermediate
+topic: Error handling
+lesson: error-handling
+kind: find-bug
+prompt: "With `set -e`, this script stops without printing anything. Which line causes the exit?"
+code: |
+  #!/usr/bin/env bash
+  set -e
+  errors=0
+  grep -q ERROR ~/logs/app.log && (( errors++ ))
+  echo "errors: $errors"
+answer: 4
+fix: |
+  grep -q ERROR ~/logs/app.log && (( ++errors ))
+hints:
+  - "`(( expr ))` fails when the expression's value is 0. What is the value of `errors++` the first time?"
+explanation: "Post-increment evaluates to the old value, 0, so `(( errors++ ))` returns status 1 — and as the last command of the `&&` list, set -e exits. Pre-increment returns 1."
+---
+id: namerefs
+title: Fill the caller's array
+difficulty: advanced
+topic: Functions
+lesson: indirection-and-namerefs
+kind: script
+prompt: "Write `split_csv_line LINE OUT` that splits LINE on commas into the array named OUT (using a nameref). Then split the first data line of `~/data/users.csv` and print `name=… role=…`."
+starter: |
+  #!/usr/bin/env bash
+  split_csv_line() {
+    :
+  }
+solution: |
+  #!/usr/bin/env bash
+  split_csv_line() {
+    local -n _out=$2
+    IFS=, read -ra _out <<< "$1"
+  }
+  line=$(sed -n 2p ~/data/users.csv)
+  split_csv_line "$line" fields
+  echo "name=${fields[1]} role=${fields[3]}"
+expectedOutput: name=Alice Johnson role=admin
+checks:
+  - pattern: (local|declare) -n
+    message: Use a nameref.
+hints:
+  - "`local -n _out=$2` makes `_out` an alias for the caller's variable."
+explanation: "Namerefs let a function return an array without eval or global variables."
+---
+id: assoc-count
+title: Sessions per user
+difficulty: advanced
+topic: Associative arrays
+lesson: associative-arrays
+kind: script
+prompt: "Count log lines per user in `~/logs/app.log` (lines contain `user=NAME`). Print `NAME COUNT` sorted by count descending, then name; ignore lines without a user."
+starter: |
+  #!/usr/bin/env bash
+  declare -A n
+solution: |
+  #!/usr/bin/env bash
+  declare -A n
+  re='user=([a-z]+)'
+  while IFS= read -r line; do
+    [[ $line =~ $re ]] && (( ++n[${BASH_REMATCH[1]}] ))
+  done < ~/logs/app.log
+  for u in "${!n[@]}"; do echo "$u ${n[$u]}"; done | sort -k2,2nr -k1,1
+expectedOutput: |
+  alice 4
+  bob 2
+checks:
+  - pattern: declare -A
+    message: Count with an associative array.
+hints:
+  - "Capture the user with `[[ $line =~ user=([a-z]+) ]]`."
+  - "Associative array order is random — sort the output."
+explanation: "Regex capture plus a map counts in one pass without spawning a process per line."
+---
+id: atomic-write
+title: Never half-written
+difficulty: advanced
+topic: Robust scripts
+lesson: atomicity-and-idempotency
+kind: mcq
+prompt: "A script regenerates `/srv/www/index.html` every minute. Readers occasionally see a truncated page. What's the best fix?"
+options:
+  - "Write with `>>` instead of `>`"
+  - "Generate into a temp file in /srv/www and `mv` it over index.html"
+  - "Add `sleep 1` before writing"
+  - "Generate in /tmp and `cp` it over index.html"
+answer: 1
+explanation: "Renaming within one filesystem is atomic. cp from /tmp still writes the destination progressively."
+---
+id: inject-mcq
+title: Spot the injection
+difficulty: advanced
+topic: Security
+lesson: secure-scripting
+kind: mcq
+prompt: "A web hook passes a user-chosen `branch` to your deploy script. Which line is safe?"
+options:
+  - "`eval \"git checkout $branch\"`"
+  - "`bash -c \"git checkout $branch\"`"
+  - "`git checkout -- \"$branch\"`"
+  - "`ssh build \"git checkout $branch\"`"
+answer: 2
+explanation: "Only the third passes the value as a single argument (after `--`) without a shell re-parsing it. Still validate it against an allow-list such as `^[A-Za-z0-9._/-]+$`."
+---
+id: performance-rewrite
+title: Zero processes per line
+difficulty: advanced
+topic: Performance
+lesson: performance
+kind: script
+prompt: "Print the login names of users in `/etc/passwd` whose home directory is under `/home`, one per line, using only `while read` and builtins (no external commands in the loop)."
+starter: |
+  #!/usr/bin/env bash
+solution: |
+  #!/usr/bin/env bash
+  while IFS=: read -r user _ _ _ _ home _; do
+    [[ $home == /home/* ]] && echo "$user"
+  done < /etc/passwd
+expectedOutput: |
+  syslog
+  learner
+  deploy
+checks:
+  - pattern: \$\(
+    forbid: true
+    message: No command substitutions in the loop.
+  - pattern: \b(cut|awk|grep)\b
+    forbid: true
+    message: Use read with IFS instead of external tools.
+hints:
+  - "`IFS=: read -r user _ _ _ _ home _` splits all seven fields."
+explanation: "read splits the fields itself, so the loop never forks."
+---
+id: portable-mcq
+title: Works on dash?
+difficulty: advanced
+topic: Portability
+lesson: portability
+kind: mcq
+prompt: "Which line runs correctly under `#!/bin/sh` on Debian (dash)?"
+options:
+  - "`[[ -f $f ]] && echo yes`"
+  - "`[ -f \"$f\" ] && echo yes`"
+  - "`echo ${f^^}`"
+  - "`files=(*.txt)`"
+answer: 1
+explanation: "`[ ]` with quoted variables is POSIX; `[[ ]]`, case conversion and arrays are Bash extensions."
+---
+id: backoff-predict
+title: Exponential backoff
+difficulty: advanced
+topic: Loops
+lesson: while-and-until
+kind: predict
+prompt: What does this print?
+code: |
+  delay=1 max=10
+  for attempt in 1 2 3 4 5; do
+    printf '%d ' "$delay"
+    delay=$(( delay * 2 > max ? max : delay * 2 ))
+  done
+  echo
+answer: "1 2 4 8 10 "
+acceptAnswers: ["1 2 4 8 10"]
+explanation: "The delay doubles each time but is capped at max by the ternary operator."
+---
+id: dry-run-wrapper
+title: A faithful dry run
+difficulty: advanced
+topic: Robust scripts
+lesson: robust-patterns
+kind: script
+prompt: "Write `run` so that with `DRY_RUN=1` it prints `would run:` followed by the shell-quoted command, and otherwise executes it. Test it on a command with an argument containing spaces."
+starter: |
+  #!/usr/bin/env bash
+  run() {
+    :
+  }
+  DRY_RUN=1 run mv -- "my report.txt" /tmp/
+  DRY_RUN=0 run echo "real run"
+solution: |
+  #!/usr/bin/env bash
+  run() {
+    if (( ${DRY_RUN:-0} )); then
+      printf 'would run:'; printf ' %q' "$@"; echo
+    else
+      "$@"
+    fi
+  }
+  DRY_RUN=1 run mv -- "my report.txt" /tmp/
+  DRY_RUN=0 run echo "real run"
+expectedOutput: |
+  would run: mv -- my\ report.txt /tmp/
+  real run
+checks:
+  - pattern: '%q'
+    message: Quote the preview with printf %q.
+hints:
+  - "`\"$@\"` runs the command exactly as given."
+  - "`printf ' %q' \"$@\"` prints each argument re-quoted."
+explanation: "Because the preview is produced from the same argument list that would be executed, it can't drift from the real behaviour."
+---
+id: parallel-wait
+title: Collect every status
+difficulty: expert
+topic: Job control
+lesson: job-control
+kind: script
+prompt: "Run `check` (given) for hosts `a b c d` in the background, then wait for each PID and print `HOST ok` or `HOST failed`, in host order, followed by `failures: N`."
+starter: |
+  #!/usr/bin/env bash
+  check() { [[ $1 != c ]]; }
+solution: |
+  #!/usr/bin/env bash
+  check() { [[ $1 != c ]]; }
+  declare -A pid
+  for h in a b c d; do check "$h" & pid[$h]=$!; done
+  failures=0
+  for h in a b c d; do
+    if wait "${pid[$h]}"; then echo "$h ok"; else echo "$h failed"; (( ++failures )); fi
+  done
+  echo "failures: $failures"
+expectedOutput: |
+  a ok
+  b ok
+  c failed
+  d ok
+  failures: 1
+checks:
+  - pattern: '&'
+    message: Start the checks in the background.
+  - pattern: wait
+    message: Collect the results with wait.
+hints:
+  - "Store each `$!` keyed by host."
+  - "`wait PID` returns that job's exit status."
+explanation: "A bare `wait` would always return 0; waiting per PID recovers each result."
+---
+id: cron-explain
+title: When does it run?
+difficulty: expert
+topic: Scheduling
+lesson: cron-and-scheduling
+kind: mcq
+prompt: "`*/20 9-17 * * 1-5` — when does this job run?"
+options:
+  - Every 20 hours on weekdays
+  - At minutes 0, 20 and 40 of every hour from 09:00 to 17:40, Monday to Friday
+  - At 09:20 and 17:20 on weekdays
+  - Every 20 minutes, every day, between 9 and 17 minutes past the hour
+answer: 1
+explanation: "Minute `*/20` → 0, 20, 40; hours 9–17 inclusive; weekdays 1–5."
+---
+id: deploy-scenario
+title: The deploy that half-worked
+difficulty: expert
+topic: Deployment
+lesson: deployment-scripts
+kind: mcq
+scenario: "Your deploy script runs `git pull && npm ci && systemctl restart app` directly in /srv/app. Today `npm ci` failed halfway: some packages are new, some old, and the site is throwing errors."
+prompt: Which redesign prevents this class of failure?
+options:
+  - Run `npm ci` twice
+  - "Build each release in its own directory, then switch a `current` symlink atomically after it's complete and verified"
+  - Add `set -e`
+  - Restart the service before running npm
+answer: 1
+explanation: "Building out of place means a failed build never touches what's serving traffic; the switch only happens once the new release is complete, and the old one stays available for rollback."
+---
+id: incident-pipeline
+title: Find the attacker
+difficulty: expert
+topic: Production operations
+lesson: production-operations
+kind: command
+prompt: "Print the client IP that caused the most 4xx responses in `~/logs/access.log`, with its count, in `uniq -c` format (one line)."
+solution: awk '$9 >= 400 && $9 < 500 { print $1 }' ~/logs/access.log | sort | uniq -c | sort -rn | head -n 1
+hints:
+  - "Status is field 9, the client IP field 1."
+explanation: "Filter by status range in awk, then count and rank."
+---
+id: health-exit-codes
+title: Worst status wins
+difficulty: expert
+topic: Monitoring
+lesson: backups-and-health-checks
+kind: script
+prompt: "Given check results `0 1 0 2 1` (0 OK, 1 WARN, 2 CRIT), print `overall: CRIT` (or WARN/OK) for the worst one and exit with that number. Print `exit N` just before exiting."
+starter: |
+  #!/usr/bin/env bash
+  results=(0 1 0 2 1)
+solution: |
+  #!/usr/bin/env bash
+  results=(0 1 0 2 1)
+  names=(OK WARN CRIT)
+  worst=0
+  for r in "${results[@]}"; do (( r > worst )) && worst=$r; done
+  echo "overall: ${names[worst]}"
+  echo "exit $worst"
+  exit "$worst"
+expectedOutput: |
+  overall: CRIT
+  exit 2
+hints:
+  - "Track the maximum value seen."
+  - "Index an array of names with the number."
+explanation: "Numeric severities make aggregation a max(), and map directly onto the monitoring-plugin exit codes."

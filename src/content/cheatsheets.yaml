@@ -1,0 +1,309 @@
+# Generated cheat sheets. Each entry: [syntax, description, example-or-null].
+sections:
+  - id: "commands"
+    title: "Everyday commands"
+    description: "The commands you'll reach for every day, with the flags that matter."
+    groups:
+      - title: "Navigate and list"
+        entries:
+          - ["pwd", "print the current directory", "pwd"]
+          - ["cd DIR / cd - / cd", "change directory / previous / home", "cd ~/projects"]
+          - ["ls -lah", "long listing, hidden files, human sizes", "ls -lah /var/log"]
+          - ["ls -lt | head", "newest files first", "ls -lt ~/downloads | head"]
+          - ["tree -L 2", "directory tree two levels deep", "tree -L 2 ~/projects"]
+      - title: "Create, copy, move, delete"
+        entries:
+          - ["mkdir -p a/b/c", "create directories including parents", "mkdir -p ~/backups/db"]
+          - ["touch FILE", "create an empty file or update its time", "touch notes.md"]
+          - ["cp -a SRC DEST", "copy recursively, preserving attributes", "cp -a site/ site.bak/"]
+          - ["mv -n OLD NEW", "move/rename without overwriting", "mv -n draft.md final.md"]
+          - ["rm -i FILE / rm -r DIR", "delete interactively / recursively", "rm -r build/"]
+          - ["ln -s TARGET LINK", "create a symbolic link", "ln -sfn releases/v2 current"]
+      - title: "Read files"
+        entries:
+          - ["cat FILE", "print a file", "cat /etc/os-release"]
+          - ["less FILE", "page through a file (q quits, / searches)", "less app.log"]
+          - ["head -n 20 / tail -n 20", "first / last lines", "tail -n 50 app.log"]
+          - ["tail -F FILE", "follow a growing file, across rotation", "tail -F /var/log/syslog"]
+          - ["wc -l FILE", "count lines (-w words, -c bytes)", "wc -l < data.csv"]
+      - title: "Find things"
+        entries:
+          - ["find DIR -name 'GLOB'", "find by name", "find . -name '*.log'"]
+          - ["find DIR -type f -mtime +7", "files older than 7 days", "find /tmp -type f -mtime +7 -print"]
+          - ["find DIR -size +100M", "big files", "find / -xdev -size +100M 2>/dev/null"]
+          - ["grep -rn PATTERN DIR", "search file contents recursively", "grep -rn 'TODO' src/"]
+          - ["command -v NAME", "is a command available? where?", "command -v jq"]
+      - title: "Text processing"
+        entries:
+          - ["sort | uniq -c | sort -rn", "count and rank lines", "cut -d' ' -f1 access.log | sort | uniq -c | sort -rn"]
+          - ["cut -d, -f2,3", "select fields", "cut -d: -f1 /etc/passwd"]
+          - ["tr a-z A-Z / tr -d '\\r'", "translate / delete characters", "tr -d '\\r' < win.txt > unix.txt"]
+          - ["sed 's/old/new/g'", "substitute text", "sed -i.bak 's/8080/9090/' app.conf"]
+          - ["awk '{print $1}'", "print a field", "awk -F, '$3 > 100' sales.csv"]
+          - ["xargs -0 CMD", "turn input into arguments", "find . -name '*.tmp' -print0 | xargs -0 rm --"]
+          - ["diff -u A B", "show differences", "diff -u old.conf new.conf"]
+      - title: "System"
+        entries:
+          - ["ps aux / pgrep -a NAME", "list / find processes", "pgrep -a nginx"]
+          - ["kill PID / kill -9 PID", "terminate politely / forcefully", "kill 4242"]
+          - ["df -h / du -sh DIR", "disk free / directory size", "du -sh ~/* | sort -h"]
+          - ["free -h / uptime", "memory / load average", "free -h"]
+          - ["systemctl status|restart NAME", "manage a systemd service", "sudo systemctl restart nginx"]
+          - ["journalctl -u NAME -f", "follow a service's logs", "journalctl -u app --since '1 hour ago'"]
+          - ["chmod / chown", "change permissions / owner", "chmod 755 deploy.sh"]
+  - id: "syntax"
+    title: "Bash syntax"
+    description: "Control flow, functions and the core grammar of scripts."
+    groups:
+      - title: "Script basics"
+        entries:
+          - ["#!/usr/bin/env bash", "shebang: run with bash from PATH"]
+          - ["set -euo pipefail", "strict mode: stop on errors, unset vars, pipe failures"]
+          - ["cmd1; cmd2", "run sequentially", "cd /tmp; ls"]
+          - ["cmd1 && cmd2", "run cmd2 only if cmd1 succeeds", "make && make install"]
+          - ["cmd1 || cmd2", "run cmd2 only if cmd1 fails", "cd \"$dir\" || exit 1"]
+          - ["{ cmd1; cmd2; }", "group in the current shell", "{ date; uptime; } > status.txt"]
+          - ["( cmd1; cmd2 )", "group in a subshell", "(cd build && make)"]
+          - ["# comment", "ignored to the end of the line"]
+      - title: "Conditionals"
+        entries:
+          - ["if CMD; then …; elif …; else …; fi", "branch on a command's exit status", "if grep -q root /etc/passwd; then echo yes; fi"]
+          - ["[[ -f $f ]]", "file test (Bash)", "[[ -d ~/backups ]] || mkdir ~/backups"]
+          - ["[[ $a == pat* ]]", "glob match", "[[ $file == *.csv ]]"]
+          - ["[[ $s =~ ^[0-9]+$ ]]", "regex match (captures in BASH_REMATCH)", "[[ $v =~ ^v([0-9]+) ]] && echo ${BASH_REMATCH[1]}"]
+          - ["(( n > 10 ))", "arithmetic comparison", "(( count >= max )) && break"]
+          - ["case $x in a|b) …;; *) …;; esac", "pattern dispatch", "case $1 in start) start;; *) usage;; esac"]
+      - title: "Loops"
+        entries:
+          - ["for x in a b c; do …; done", "loop over words", "for env in dev prod; do deploy \"$env\"; done"]
+          - ["for f in *.log; do …; done", "loop over files (safe with spaces)", "for f in ./*.jpg; do echo \"$f\"; done"]
+          - ["for ((i=0; i<n; i++))", "C-style counter loop", "for ((i=1; i<=3; i++)); do echo $i; done"]
+          - ["while IFS= read -r line; do …; done < file", "read a file line by line"]
+          - ["until CMD; do …; done", "loop until a command succeeds", "until curl -fs localhost:8080; do sleep 1; done"]
+          - ["break / continue", "leave the loop / next iteration"]
+      - title: "Functions"
+        entries:
+          - ["name() { …; }", "define a function", "greet() { echo \"hi $1\"; }"]
+          - ["local var=value", "function-local variable"]
+          - ["return N", "set the function's exit status"]
+          - ["out=$(func args)", "capture a function's output", "today=$(date +%F)"]
+          - ["[[ ${BASH_SOURCE[0]} == \"$0\" ]] && main \"$@\"", "run main only when executed, not sourced"]
+  - id: "variables"
+    title: "Variables and parameters"
+    description: "Assignment, special parameters, arrays and scope."
+    groups:
+      - title: "Assignment"
+        entries:
+          - ["name=value", "no spaces around =", "count=0"]
+          - ["readonly NAME=value", "constant", "readonly CONFIG=/etc/app.conf"]
+          - ["export NAME=value", "pass to child processes", "export EDITOR=vim"]
+          - ["NAME=value cmd", "set only for one command", "LC_ALL=C sort file"]
+          - ["unset NAME", "remove a variable"]
+      - title: "Special parameters"
+        entries:
+          - ["$0", "script name"]
+          - ["$1 … ${10}", "positional arguments"]
+          - ["$#", "number of arguments"]
+          - ["\"$@\"", "all arguments, each kept separate", "for a in \"$@\"; do …; done"]
+          - ["$?", "exit status of the last command"]
+          - ["$$ / $!", "PID of the shell / of the last background job"]
+          - ["shift [N]", "drop the first N arguments"]
+      - title: "Indexed arrays"
+        entries:
+          - ["arr=(a \"b c\" d)", "create"]
+          - ["arr+=(e)", "append"]
+          - ["\"${arr[@]}\"", "all elements, safely", "printf '%s\\n' \"${arr[@]}\""]
+          - ["${#arr[@]}", "number of elements"]
+          - ["${!arr[@]}", "indices"]
+          - ["${arr[@]:1:2}", "slice"]
+          - ["mapfile -t arr < file", "read lines into an array", "mapfile -t hosts < hosts.txt"]
+      - title: "Associative arrays (Bash 4+)"
+        entries:
+          - ["declare -A map", "required before use"]
+          - ["map[key]=value", "set", "port[http]=80"]
+          - ["${map[key]:-default}", "get with default"]
+          - ["[[ -v map[key] ]]", "key exists?"]
+          - ["for k in \"${!map[@]}\"", "iterate keys (unordered)"]
+  - id: "expansions"
+    title: "Expansions"
+    description: "What the shell does to a word before running a command, in order."
+    groups:
+      - title: "Order of expansions"
+        entries:
+          - ["1. brace", "{a,b} {1..5}", "mkdir {src,docs}"]
+          - ["2. tilde", "~ ~user"]
+          - ["3. parameter, arithmetic, command substitution", "$var $((1+2)) $(cmd)"]
+          - ["4. word splitting", "unquoted results split on IFS"]
+          - ["5. globbing", "* ? [..] match file names"]
+          - ["6. quote removal", "quotes are removed last"]
+      - title: "Parameter expansion"
+        entries:
+          - ["${v:-default}", "default if unset or empty", "${PORT:-8080}"]
+          - ["${v:=default}", "assign default", ": \"${LOG_DIR:=/var/log/app}\""]
+          - ["${v:?message}", "error if unset or empty", "${1:?usage: script FILE}"]
+          - ["${v:+alt}", "alt if set"]
+          - ["${#v}", "length"]
+          - ["${v#pat} / ${v##pat}", "remove shortest / longest prefix", "${path##*/}  # basename"]
+          - ["${v%pat} / ${v%%pat}", "remove shortest / longest suffix", "${file%.*}  # drop extension"]
+          - ["${v/old/new} / ${v//old/new}", "replace first / all", "${name// /_}"]
+          - ["${v^^} / ${v,,}", "upper / lower case"]
+          - ["${v:offset:len}", "substring", "${date:0:4}"]
+          - ["${!name}", "indirect: value of the variable named by name"]
+      - title: "Quoting"
+        entries:
+          - ["\"double\"", "expands $var and $(cmd), no splitting or globbing", "echo \"$HOME has $(ls | wc -l) entries\""]
+          - ["'single'", "completely literal", "echo '$HOME'"]
+          - ["$'ansi'", "escape sequences like \\n \\t", "IFS=$'\\n'"]
+          - ["\\c", "escape one character", "echo \\$5"]
+      - title: "Globs"
+        entries:
+          - ["*", "any string", "*.log"]
+          - ["?", "one character", "file?.txt"]
+          - ["[abc] / [!abc]", "one of / none of", "[0-9]*"]
+          - ["**", "any depth (shopt -s globstar)", "**/*.sh"]
+          - ["shopt -s nullglob", "no match → nothing (not the literal pattern)"]
+  - id: "redirection"
+    title: "Redirection and pipes"
+    description: "Wiring standard input, output and error."
+    groups:
+      - title: "Redirection"
+        entries:
+          - ["cmd > file", "stdout to file (overwrite)"]
+          - ["cmd >> file", "append"]
+          - ["cmd 2> file", "stderr to file", "find / -name x 2>/dev/null"]
+          - ["cmd > file 2>&1", "stdout and stderr to file (order matters)"]
+          - ["cmd &> file", "both (Bash)"]
+          - ["cmd < file", "stdin from file", "wc -l < data.csv"]
+          - ["cmd <<'EOF' … EOF", "here-document (quoted: no expansion)"]
+          - ["cmd <<< \"$var\"", "here-string", "read -r a b <<< \"$line\""]
+          - [">&2 echo msg", "print to stderr", "echo \"error: $msg\" >&2"]
+      - title: "Pipes and substitution"
+        entries:
+          - ["cmd1 | cmd2", "stdout of cmd1 → stdin of cmd2"]
+          - ["cmd1 |& cmd2", "stdout and stderr"]
+          - ["$(cmd)", "command substitution", "now=$(date +%s)"]
+          - ["<(cmd)", "process substitution (a file name)", "diff <(sort a) <(sort b)"]
+          - ["cmd | tee file", "show and save", "make 2>&1 | tee build.log"]
+          - ["${PIPESTATUS[@]}", "exit status of every pipeline part"]
+      - title: "File descriptors"
+        entries:
+          - ["exec 3> file", "open fd 3 for writing"]
+          - ["echo x >&3", "write to fd 3"]
+          - ["exec 3>&-", "close fd 3"]
+          - ["exec {fd}< file", "let Bash pick a free fd"]
+          - ["/dev/null", "discard output / empty input"]
+  - id: "regex"
+    title: "Regular expressions"
+    description: "Patterns for grep, sed, awk and [[ =~ ]]."
+    groups:
+      - title: "Basics (ERE: grep -E, sed -E, awk, =~)"
+        entries:
+          - [".", "any character"]
+          - ["^ / $", "start / end of line", "^ERROR"]
+          - ["[abc] / [^abc]", "character class / negated"]
+          - ["[0-9] [[:digit:]] [[:space:]]", "classes"]
+          - ["* + ?", "0+, 1+, 0 or 1 of the previous item"]
+          - ["{n} {n,} {n,m}", "exact / at least / range", "[0-9]{3}"]
+          - ["a|b", "alternation", "(GET|POST)"]
+          - ["( )", "group / capture"]
+          - ["\\.", "literal dot", "\\.log$"]
+      - title: "Tool specifics"
+        entries:
+          - ["grep -E / -F / -P", "extended / fixed string / Perl (GNU)", "grep -F '[warn]' app.log"]
+          - ["grep -o", "print only the match", "grep -oE '[0-9.]{7,15}' access.log"]
+          - ["grep -w / -x / -i / -v", "whole word / whole line / ignore case / invert"]
+          - ["sed -E 's/(a)(b)/\\2\\1/'", "backreferences in replacements"]
+          - ["BASH_REMATCH[1]", "first capture after [[ =~ ]]"]
+      - title: "Handy patterns"
+        entries:
+          - ["^[0-9]+$", "integer"]
+          - ["^[a-z_][a-z0-9_-]*$", "safe name"]
+          - ["([0-9]{1,3}\\.){3}[0-9]{1,3}", "IPv4-like"]
+          - ["^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "ISO date"]
+          - ["^#|^$", "comment or blank line", "grep -vE '^#|^$' config"]
+  - id: "patterns"
+    title: "Scripting patterns"
+    description: "Idioms that make scripts correct and robust."
+    groups:
+      - title: "Safe defaults"
+        entries:
+          - ["set -euo pipefail", "fail fast"]
+          - ["die() { echo \"$*\" >&2; exit 1; }", "error helper"]
+          - ["trap 'rm -rf -- \"$tmp\"' EXIT", "always clean up"]
+          - ["tmp=$(mktemp -d)", "private temp directory"]
+          - ["cmd -- \"$file\"", "end options before file names", "rm -- \"$f\""]
+          - ["${var:?}", "abort if empty before dangerous use", "rm -rf -- \"${dir:?}\"/*"]
+      - title: "Input"
+        entries:
+          - ["while getopts ':vo:' opt; do case $opt in …; esac; done", "parse options"]
+          - ["shift $((OPTIND - 1))", "drop parsed options"]
+          - ["read -rp 'Name: ' name", "prompt for input"]
+          - ["[[ -t 0 ]] || data=$(cat)", "read stdin only when piped"]
+      - title: "Files and atomicity"
+        entries:
+          - ["while IFS= read -r -d '' f; do …; done < <(find … -print0)", "NUL-safe file loop"]
+          - ["cmd > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"", "atomic write"]
+          - ["mkdir \"$lock\" || exit", "simple lock"]
+          - ["flock -n 9 || exit 1", "kernel lock (with exec 9>lockfile)"]
+          - ["grep -qxF \"$line\" f || echo \"$line\" >> f", "idempotent append"]
+      - title: "Processes"
+        entries:
+          - ["cmd & pid=$!; wait \"$pid\"", "background and collect status"]
+          - ["timeout 10 cmd", "limit run time (exit 124 on timeout)"]
+          - ["exec \"$@\"", "replace the shell (entrypoints)"]
+          - ["run() { (( DRY_RUN )) && echo \"would: $*\" || \"$@\"; }", "dry-run wrapper"]
+  - id: "debugging"
+    title: "Debugging"
+    description: "Find out what your script is really doing."
+    groups:
+      - title: "Tracing and checking"
+        entries:
+          - ["bash -n script", "syntax check without running"]
+          - ["bash -x script", "trace every command"]
+          - ["set -x … set +x", "trace part of a script"]
+          - ["PS4='+ ${LINENO}: '", "add line numbers to traces"]
+          - ["shellcheck script", "static analysis — catches most quoting bugs"]
+          - ["declare -p var", "show a variable's exact value and type"]
+          - ["type -a name", "how a name resolves"]
+      - title: "Diagnostics"
+        entries:
+          - ["trap 'echo \"line $LINENO: $BASH_COMMAND\" >&2' ERR", "report failing commands"]
+          - ["caller / FUNCNAME / BASH_LINENO", "call stack information"]
+          - ["echo \"debug: $x\" >&2", "debug output on stderr"]
+          - ["env -i bash --noprofile --norc", "a clean shell to reproduce issues"]
+      - title: "Common errors"
+        entries:
+          - ["command not found (127)", "typo, or not in PATH"]
+          - ["Permission denied (126)", "not executable — chmod +x"]
+          - ["unbound variable", "set -u caught an unset name — use ${v:-}"]
+          - ["binary operator expected", "unquoted variable inside [ ]"]
+          - ["$'\\r': command not found", "Windows line endings — sed -i 's/\\r$//'"]
+  - id: "utilities"
+    title: "Linux administration"
+    description: "Users, permissions, networking and scheduling."
+    groups:
+      - title: "Users and permissions"
+        entries:
+          - ["id / groups / whoami", "who am I, which groups"]
+          - ["chmod 640 file / chmod u+x f", "octal / symbolic modes"]
+          - ["chown user:group file", "change ownership"]
+          - ["umask 077", "private defaults for new files"]
+          - ["sudo -u user cmd", "run as another user"]
+          - ["visudo", "edit sudoers safely"]
+      - title: "Networking"
+        entries:
+          - ["ip -br addr / ip route", "addresses and routes"]
+          - ["ss -tlnp", "listening TCP ports with processes"]
+          - ["getent hosts NAME / dig +short NAME", "name resolution"]
+          - ["curl -fsS --max-time 5 URL", "HTTP request that fails on errors"]
+          - ["ssh host 'cmd' / ssh -n", "remote command / don't read stdin"]
+          - ["rsync -az --delete src/ host:dest/", "efficient sync"]
+          - ["scp file host:/path/", "copy a file"]
+      - title: "Scheduling and archives"
+        entries:
+          - ["crontab -e / crontab -l", "edit / list cron jobs"]
+          - ["*/15 * * * * cmd", "every 15 minutes"]
+          - ["0 2 * * 1-5 cmd", "02:00 on weekdays"]
+          - ["systemctl list-timers", "systemd timers"]
+          - ["tar -czf a.tgz -C dir .", "create a gzip archive"]
+          - ["tar -tzf a.tgz / tar -xzf a.tgz -C dest", "list / extract"]

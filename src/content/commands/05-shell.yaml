@@ -1,0 +1,365 @@
+read:
+  category: Shell builtins
+  origin: bash-builtin
+  summary: Read a line from standard input and split it into variables.
+  why: Scripts need input — from users, files and pipes. `read` is how a shell script consumes it one line at a time.
+  syntax:
+    - read [-r] [-p PROMPT] [-a ARRAY] [-d DELIM] [-t SECS] [-s] [NAME]...
+  flags:
+    - flag: -r
+      description: Raw — don't treat backslashes as escapes. Almost always what you want.
+    - flag: -p PROMPT
+      description: Show a prompt (interactive input only).
+    - flag: -a ARRAY
+      description: Split the line into an indexed array.
+    - flag: -s
+      description: Silent — don't echo typed characters (passwords).
+    - flag: -t SECS
+      description: Time out after SECS seconds.
+    - flag: -d DELIM
+      description: Read until DELIM instead of newline (`-d ''` reads until NUL).
+  examples:
+    - code: |
+        read -r -p "Your name: " name
+        echo "Hello, $name"
+      description: Prompt the user.
+    - code: |
+        while IFS= read -r line; do
+          echo ">> $line"
+        done < notes.txt
+      description: The correct way to process a file line by line.
+    - code: IFS=: read -r user _ uid _ <<< "learner:x:1000:1000"
+      description: Split on a custom separator; `_` discards fields.
+  useCases:
+    - Interactive prompts; line-by-line file processing; parsing delimited data.
+  mistakes:
+    - Omitting `-r`, which mangles backslashes.
+    - Omitting `IFS=`, which strips leading and trailing whitespace from lines.
+    - Piping into `while read` and expecting variables set inside the loop to survive (the loop runs in a subshell).
+  related: [mapfile, printf]
+
+mapfile:
+  category: Shell builtins
+  origin: bash-builtin
+  summary: Read lines from standard input into an array (also called readarray).
+  why: Loading a whole file or command output into an array, one element per line, safely and quickly.
+  syntax:
+    - mapfile [-t] [-n COUNT] [-s SKIP] ARRAY
+  flags:
+    - flag: -t
+      description: Remove the trailing newline from each element (almost always wanted).
+    - flag: -n COUNT
+      description: Read at most COUNT lines.
+    - flag: -s SKIP
+      description: Skip the first SKIP lines.
+  examples:
+    - code: |
+        mapfile -t servers < data/servers.txt
+        echo "${#servers[@]} servers, first: ${servers[0]}"
+      description: File into array.
+    - code: mapfile -t logs < <(find /var/log -name '*.log')
+      description: Command output into an array without word-splitting problems.
+  useCases:
+    - Loading lists of hosts, files or tasks to iterate over.
+  mistakes:
+    - "`cmd | mapfile -t arr` — the array is filled in a subshell and lost. Use `< <(cmd)`."
+  related: [read]
+  portability: Bash 4.0+. Not available in macOS's default Bash 3.2.
+
+export:
+  category: Shell builtins
+  origin: bash-builtin
+  summary: Mark variables to be passed to child processes (the environment).
+  why: >-
+    Shell variables are private to the shell. Programs you launch only see exported variables, which is how you
+    configure them (PATH, EDITOR, API_URL, LANG...).
+  syntax:
+    - export NAME[=VALUE]...
+    - export -n NAME
+    - export -p
+  flags:
+    - flag: -n
+      description: Remove the export attribute (keep the variable).
+    - flag: -p
+      description: List exported variables.
+  examples:
+    - code: |
+        export EDITOR=nano
+        bash -c 'echo $EDITOR'
+      description: The child process sees the exported variable.
+    - code: DEBUG=1 ./build.sh
+      description: Set a variable for one command only — no export needed.
+  useCases:
+    - Configuring programs via environment variables; setting PATH in ~/.bashrc.
+  mistakes:
+    - Expecting a child script's `export` to change the parent shell — environment only flows downward.
+    - "`export VAR = value` with spaces is an error."
+  related: [env, source, set]
+
+env:
+  category: Shell builtins
+  origin: posix-utility
+  summary: Print the environment, or run a command with a modified environment.
+  why: Shows exactly what child processes will inherit, and lets you run a program with extra or no variables.
+  syntax:
+    - env [-i] [NAME=VALUE]... [COMMAND [ARG]...]
+  flags:
+    - flag: -i
+      description: Start with an empty environment.
+    - flag: -u NAME
+      description: Remove NAME from the environment.
+  examples:
+    - code: env | sort | head
+      description: List environment variables.
+    - code: env -i PATH=/usr/bin:/bin bash -c 'env'
+      description: Simulate cron's minimal environment to debug scheduled jobs.
+    - code: "#!/usr/bin/env bash"
+      description: In a shebang, `env` finds bash wherever it is in PATH.
+  useCases:
+    - Debugging environment-dependent bugs; portable shebang lines.
+  mistakes:
+    - Confusing `env` (environment only) with `set` (all shell variables and functions).
+  related: [export, printenv]
+
+printenv:
+  category: Shell builtins
+  origin: gnu-coreutils
+  summary: Print the values of environment variables.
+  why: A quick way to check one environment variable without shell expansion getting involved.
+  syntax:
+    - printenv [NAME]...
+  examples:
+    - code: printenv HOME PATH
+      description: Print specific variables.
+  useCases:
+    - Checking what a program will see in its environment.
+  mistakes:
+    - Looking for non-exported shell variables — `printenv` only sees the environment.
+  related: [env, export]
+
+source:
+  category: Shell builtins
+  origin: bash-builtin
+  summary: Run a file's commands in the current shell (also written `.`).
+  why: >-
+    Running a script normally starts a child process, so its variables, functions and `cd` vanish when it ends.
+    `source` executes it inside your shell — that's how config files, libraries and `.bashrc` work.
+  syntax:
+    - source FILE [ARGS]...
+    - . FILE [ARGS]...
+  examples:
+    - code: source ~/.bashrc
+      description: Reload your shell configuration after editing it.
+    - code: |
+        . "$script_dir/lib/logging.sh"
+        log_info "loaded"
+      description: Load a library of functions into a script.
+  useCases:
+    - Loading configuration and function libraries; activating environments (`source venv/bin/activate`).
+  mistakes:
+    - Sourcing untrusted files — it executes arbitrary code with your permissions.
+    - "`source` is Bash; in POSIX sh only `.` works."
+  related: [export, set]
+
+set:
+  category: Shell builtins
+  origin: bash-builtin
+  summary: Change shell options, set positional parameters, or list variables.
+  why: Controls how the shell itself behaves — error handling, tracing, globbing — and lets you replace $1, $2, ...
+  syntax:
+    - set [-euxo OPTION] [--] [ARG]...
+    - set +e
+  flags:
+    - flag: -e
+      description: Exit when a command fails (errexit), with important exceptions.
+    - flag: -u
+      description: Treat unset variables as errors (nounset).
+    - flag: -x
+      description: Print each command before executing it (xtrace).
+    - flag: -o pipefail
+      description: A pipeline fails if any stage fails, not just the last.
+    - flag: -C
+      description: noclobber — `>` won't overwrite existing files (`>|` forces).
+    - flag: -- ARGS
+      description: Replace the positional parameters with ARGS.
+  examples:
+    - code: set -euo pipefail
+      description: "\"Strict mode\": useful, but read the error-handling lesson for its many pitfalls."
+    - code: |
+        set -x
+        cp "$src" "$dst"
+        set +x
+      description: Trace just one section of a script.
+    - code: set -- one two three; echo "$2"
+      description: Set positional parameters.
+      output: two
+  useCases:
+    - Debugging (`-x`); making scripts fail fast; parsing strings into positional parameters.
+  mistakes:
+    - Treating `set -e` as complete error handling — it is silently disabled in many contexts.
+  related: [shopt, trap]
+
+shopt:
+  category: Shell builtins
+  origin: bash-builtin
+  summary: Toggle Bash-specific optional behaviours.
+  why: Bash has more options than `set` covers — globbing behaviour, history and compatibility switches live here.
+  syntax:
+    - shopt [-s | -u] OPTNAME...
+  flags:
+    - flag: -s
+      description: Enable (set) the option.
+    - flag: -u
+      description: Disable (unset) the option.
+    - flag: nullglob
+      description: Globs that match nothing expand to nothing (instead of themselves).
+    - flag: dotglob
+      description: Globs also match hidden files.
+    - flag: globstar
+      description: "`**` matches files in all subdirectories recursively."
+    - flag: extglob
+      description: Extended patterns like `!(*.log)` and `+(a|b)`.
+  examples:
+    - code: |
+        shopt -s nullglob
+        for f in *.csv; do echo "$f"; done
+      description: No iterations at all if there are no CSV files.
+    - code: shopt -s globstar; ls **/*.sh
+      description: All shell scripts in every subdirectory.
+  useCases:
+    - Safer loops over globs; recursive globbing without find.
+  mistakes:
+    - Turning on nullglob globally and then running `ls *.x` — with no matches, `ls` lists the current directory.
+  related: [set]
+
+trap:
+  category: Shell builtins
+  origin: bash-builtin
+  summary: Run commands when the shell receives a signal or exits.
+  why: >-
+    Scripts get interrupted (Ctrl+C, kill, SSH drops) and fail halfway. `trap` lets them clean up temporary files,
+    release locks and report errors no matter how they end.
+  syntax:
+    - trap 'COMMANDS' SIGNAL...
+    - trap - SIGNAL
+    - trap -p
+  flags:
+    - flag: EXIT
+      description: Runs when the shell exits for any reason — the best place for cleanup.
+    - flag: ERR
+      description: Runs when a command fails (same conditions as `set -e`).
+    - flag: INT / TERM / HUP
+      description: Ctrl+C / kill / terminal hang-up.
+    - flag: "''"
+      description: An empty action ignores the signal.
+  examples:
+    - code: |
+        tmp=$(mktemp)
+        trap 'rm -f "$tmp"' EXIT
+      description: Guaranteed cleanup of a temporary file.
+    - code: |
+        trap 'echo "failed at line $LINENO" >&2' ERR
+      description: Report where a script failed.
+  useCases:
+    - Cleanup of temp files and locks; graceful shutdown of services; error reporting.
+  mistakes:
+    - Using double quotes so variables expand when the trap is set rather than when it runs.
+    - Trying to trap SIGKILL (9) — it can't be caught.
+  related: [kill, set]
+
+getopts:
+  category: Shell builtins
+  origin: bash-builtin
+  summary: Parse short command-line options (-v, -o FILE, -abc) one at a time.
+  why: Hand-written option parsing is buggy. `getopts` handles combined flags, option arguments and errors consistently.
+  syntax:
+    - getopts OPTSTRING NAME [ARGS]...
+  flags:
+    - flag: OPTSTRING
+      description: Letters of valid options; a `:` after a letter means it takes an argument; a leading `:` enables silent error handling.
+    - flag: OPTARG
+      description: The argument of the current option.
+    - flag: OPTIND
+      description: Index of the next argument; `shift $((OPTIND-1))` leaves the operands.
+  examples:
+    - code: |
+        while getopts ':vo:' opt; do
+          case $opt in
+            v) verbose=1 ;;
+            o) out=$OPTARG ;;
+            :) echo "-$OPTARG needs a value" >&2; exit 64 ;;
+            ?) echo "unknown -$OPTARG" >&2; exit 64 ;;
+          esac
+        done
+        shift $((OPTIND - 1))
+      description: The standard loop.
+  useCases:
+    - Every script that accepts flags.
+  mistakes:
+    - Forgetting `shift $((OPTIND-1))`, so options remain in `$@`.
+    - Expecting long options (`--verbose`) — getopts only handles single letters.
+  related: [set]
+  portability: POSIX builtin. The external `getopt` program is different and inconsistent across platforms.
+
+test:
+  category: Shell builtins
+  origin: bash-builtin
+  summary: Evaluate a condition — file checks, string and number comparisons. Also written `[ ... ]`.
+  why: "`if` runs a command and checks its exit status; `test` is the command that turns a condition into an exit status."
+  syntax:
+    - test EXPRESSION
+    - '[ EXPRESSION ]'
+  flags:
+    - flag: -f / -d / -e
+      description: Is a regular file / directory / exists.
+    - flag: -z / -n
+      description: String is empty / non-empty.
+    - flag: = / !=
+      description: String equality.
+    - flag: -eq -ne -lt -le -gt -ge
+      description: Integer comparisons.
+    - flag: ! / -a / -o
+      description: Not / and / or (prefer `&&`, `||` between separate tests).
+  examples:
+    - code: '[ -f notes.txt ] && echo "exists"'
+      description: File test.
+    - code: |
+        if [ "$#" -lt 1 ]; then echo "usage: $0 FILE" >&2; exit 1; fi
+      description: Validate the argument count.
+  useCases:
+    - All conditions in POSIX scripts.
+  mistakes:
+    - Missing spaces — `[$x = 1]` is an error; `[` is a command and needs separate arguments.
+    - Unquoted variables — `[ $x = y ]` breaks when x is empty or has spaces.
+    - Using `>` for numbers — inside `[ ]` it's a redirection! Use `-gt`.
+  related: [set]
+  portability: "`[ ]` is POSIX. Bash's `[[ ]]` is safer but not available in sh."
+
+mktemp:
+  category: Shell builtins
+  origin: gnu-coreutils
+  summary: Create a unique temporary file or directory safely.
+  why: >-
+    Predictable names like `/tmp/myscript.tmp` collide between runs and can be hijacked by other users. `mktemp`
+    creates an unguessable name with private (0600) permissions atomically.
+  syntax:
+    - mktemp [-d] [-t] [TEMPLATE]
+  flags:
+    - flag: -d
+      description: Create a directory instead of a file.
+    - flag: TEMPLATE
+      description: A name ending in at least three X's, e.g. `report.XXXXXX`.
+  examples:
+    - code: |
+        tmp=$(mktemp) || exit 1
+        trap 'rm -f "$tmp"' EXIT
+        sort data/fruits.txt > "$tmp"
+      description: The standard pattern — create, register cleanup, use.
+    - code: workdir=$(mktemp -d)
+      description: A private scratch directory.
+  useCases:
+    - Intermediate files in scripts; safe atomic writes (write temp, then `mv`).
+  mistakes:
+    - Hard-coding temp file names in shared directories like /tmp.
+  related: [trap]
+  portability: Not POSIX but available on Linux and macOS (with slightly different `-t` semantics).

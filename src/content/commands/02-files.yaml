@@ -1,0 +1,406 @@
+ls:
+  category: Files
+  origin: gnu-coreutils
+  summary: List directory contents and file details.
+  why: >-
+    You can't see a filesystem directly from a shell; `ls` is your eyes. With `-l` it also shows permissions, owner,
+    size and modification time — the metadata you need for most troubleshooting.
+  syntax:
+    - ls [OPTION]... [FILE]...
+  flags:
+    - flag: -l
+      description: Long format — permissions, link count, owner, group, size, date, name.
+    - flag: -a
+      description: Include hidden entries (names starting with `.`), plus `.` and `..`.
+    - flag: -A
+      description: Like `-a` but without `.` and `..`.
+    - flag: -h
+      description: Human-readable sizes (K, M, G) with `-l`.
+    - flag: -t
+      description: Sort by modification time, newest first.
+    - flag: -S
+      description: Sort by size, largest first.
+    - flag: -r
+      description: Reverse the sort order.
+    - flag: -R
+      description: List subdirectories recursively.
+    - flag: -d
+      description: List a directory itself, not its contents.
+    - flag: -1
+      description: One name per line.
+    - flag: -F
+      description: Append a type indicator (`/` for directories, `*` for executables).
+  examples:
+    - code: ls
+      description: Names in the current directory, in columns.
+    - code: ls -lah ~/logs
+      description: The everyday "show me everything" listing.
+    - code: ls -lt logs | head -5
+      description: The most recently modified files first.
+    - code: ls -d */
+      description: Only directories (the glob `*/` matches directories).
+  useCases:
+    - Check whether a file exists and how large it is.
+    - Inspect permissions when you get "Permission denied".
+    - Find the newest log or backup file.
+  mistakes:
+    - Parsing `ls` output in scripts (`for f in $(ls)`) — names with spaces or newlines break it. Use globs (`for f in *`) or `find`.
+    - Forgetting hidden files exist; `ls` without `-a` doesn't show `.bashrc` or `.git`.
+  related: [cd, tree, stat, find]
+  portability: "Basic flags are POSIX. GNU adds `--color`, `-h` for `du`-style sizes and long options; macOS `ls` uses `-G` for colour."
+
+cd:
+  category: Files
+  origin: bash-builtin
+  summary: Change the shell's current working directory.
+  why: >-
+    Relative paths are resolved against the current directory, so moving into the directory you are working in keeps
+    commands short. `cd` must be a builtin: a child process could only change its own directory, not the shell's.
+  syntax:
+    - cd [DIR]
+    - cd -
+  flags:
+    - flag: (no argument)
+      description: Go to your home directory ($HOME).
+    - flag: "-"
+      description: Go back to the previous directory ($OLDPWD) and print it.
+    - flag: ..
+      description: Go up one level to the parent directory.
+  examples:
+    - code: cd /var/log
+      description: An absolute path — works from anywhere.
+    - code: cd ../projects
+      description: A relative path — up one level, then into projects.
+    - code: cd -
+      description: Jump back and forth between two directories.
+    - code: |
+        cd "$backup_dir" || exit 1
+      description: In scripts, always handle failure — otherwise later commands run in the wrong directory.
+  useCases:
+    - Navigate the filesystem interactively.
+    - Run a series of commands relative to a project directory in a script.
+  mistakes:
+    - Writing `cd $dir` unquoted — fails for paths containing spaces.
+    - Not checking `cd` succeeded before `rm -rf *`. A failed `cd` leaves you where you were.
+    - Expecting `cd` inside a script to change the directory of your terminal; it only affects the script's own process.
+  related: [pwd, ls]
+  portability: POSIX builtin. `cd -` and CDPATH are POSIX too.
+
+tree:
+  category: Files
+  origin: external-tool
+  summary: Display a directory hierarchy as an indented tree.
+  why: Seeing nested structure at a glance is much easier than reading several `ls` listings.
+  syntax:
+    - tree [-a] [-d] [-L LEVEL] [DIR]...
+  flags:
+    - flag: -L N
+      description: Descend at most N levels.
+    - flag: -d
+      description: Directories only.
+    - flag: -a
+      description: Include hidden files.
+    - flag: --dirsfirst
+      description: List directories before files.
+  examples:
+    - code: tree -L 2
+      description: The top two levels of the current directory.
+    - code: tree -d projects
+      description: Only the folder structure of a project.
+  useCases:
+    - Documenting a project layout in a README.
+    - Understanding an unfamiliar repository quickly.
+  mistakes:
+    - Assuming it is installed — `tree` is a separate package (`apt install tree`). `find . -maxdepth 2` works everywhere.
+  related: [ls, find]
+
+mkdir:
+  category: Files
+  origin: posix-utility
+  summary: Create directories.
+  why: Organising files means creating folders. `-p` makes it safe to call repeatedly and to create whole paths at once.
+  syntax:
+    - mkdir [-p] [-v] [-m MODE] DIRECTORY...
+  flags:
+    - flag: -p
+      description: Create parent directories as needed; no error if the directory already exists.
+    - flag: -v
+      description: Print a message for each directory created.
+    - flag: -m MODE
+      description: Set permissions, e.g. `-m 700`.
+  examples:
+    - code: mkdir notes
+      description: One directory in the current location.
+    - code: mkdir -p project/{src,tests,docs}
+      description: Create a project skeleton in one command using brace expansion.
+    - code: mkdir -p "$HOME/backups/$(date +%Y/%m)"
+      description: Nested, date-based directories — `-p` creates every missing level.
+  useCases:
+    - Creating output directories at the start of scripts (`mkdir -p "$out"`).
+    - Scaffolding project layouts.
+  mistakes:
+    - Running `mkdir` without `-p` in scripts that may be re-run — the second run fails with "File exists".
+    - "Spaces in names: `mkdir my folder` creates two directories, `my` and `folder`. Quote it: `mkdir \"my folder\"`."
+  related: [rmdir, touch]
+
+touch:
+  category: Files
+  origin: posix-utility
+  summary: Create empty files, or update the timestamps of existing ones.
+  why: >-
+    Its real purpose is updating modification times (which tools like `make` and `find -newer` rely on); creating an
+    empty file when it doesn't exist is a convenient side effect.
+  syntax:
+    - touch [-c] [-d DATE] [-r REF] FILE...
+  flags:
+    - flag: -c
+      description: Don't create files that don't exist.
+    - flag: -d DATE
+      description: Use the given date instead of now (GNU).
+    - flag: -r REF
+      description: Copy the timestamp of another file.
+  examples:
+    - code: touch app.log
+      description: Create an empty file (or refresh its timestamp).
+    - code: touch report-{1..3}.txt
+      description: Several files at once.
+    - code: touch -d '2 days ago' old.log
+      description: Backdate a file to test a cleanup script (GNU).
+  useCases:
+    - Creating placeholder or marker files (`touch .deployed`).
+    - Testing age-based cleanup scripts.
+  mistakes:
+    - Using `touch` to "save" a file — it never changes contents.
+  related: [mkdir, stat, find]
+
+rmdir:
+  category: Files
+  origin: posix-utility
+  summary: Remove empty directories.
+  why: A safe way to delete directories — it refuses if the directory still contains anything.
+  syntax:
+    - rmdir [-p] DIRECTORY...
+  flags:
+    - flag: -p
+      description: Also remove parent directories that become empty.
+  examples:
+    - code: rmdir old_project
+      description: Succeeds only if old_project is empty.
+    - code: rmdir -p a/b/c
+      description: Removes c, then b, then a — as long as each becomes empty.
+  useCases:
+    - Cleaning up empty folders without risking the loss of files.
+  mistakes:
+    - Expecting it to delete contents. Use `rm -r` (carefully) for non-empty directories.
+  related: [rm, mkdir]
+
+rm:
+  category: Files
+  origin: posix-utility
+  summary: Remove files and (with -r) directories. There is no undo.
+  why: >-
+    Deleting is unavoidable in automation — temp files, old logs, build artefacts. `rm` unlinks names immediately;
+    there is no recycle bin, which is why its flags deserve respect.
+  syntax:
+    - rm [-i] [-f] [-r] [-v] FILE...
+  flags:
+    - flag: -r
+      description: Recursive — remove directories and everything inside them.
+    - flag: -f
+      description: Force — ignore missing files and never prompt.
+    - flag: -i
+      description: Ask before every removal.
+    - flag: -v
+      description: Explain what is being removed.
+    - flag: --
+      description: End of options; protects against file names that start with `-`.
+  examples:
+    - code: rm notes.txt
+      description: Delete one file.
+    - code: rm -i *.log
+      description: Confirm each deletion — useful when a glob might match more than you think.
+    - code: rm -r -- "$build_dir"
+      description: Remove a directory tree. Quote the variable and use `--`.
+    - code: |
+        [[ -n $tmp && $tmp == /tmp/* ]] && rm -rf -- "$tmp"
+      description: Defensive deletion in scripts — check the variable is non-empty and where you expect.
+  useCases:
+    - Cleaning up temporary files and build outputs.
+    - Implementing retention policies with `find ... -delete` or `rm`.
+  mistakes:
+    - "`rm -rf $dir/*` when `$dir` is empty becomes `rm -rf /*`. Use `set -u`, `${dir:?}` and quotes."
+    - Running `rm` on a glob without previewing it first with `echo` or `ls`.
+    - Thinking `-f` makes deletion "safer" — it only suppresses errors and prompts.
+  related: [rmdir, find]
+  portability: GNU rm refuses `rm -rf /` by default (`--preserve-root`). Never rely on that.
+
+cp:
+  category: Files
+  origin: posix-utility
+  summary: Copy files and directories.
+  why: Copies are the basis of backups, templates and staging changes before editing.
+  syntax:
+    - cp [OPTION]... SOURCE DEST
+    - cp [OPTION]... SOURCE... DIRECTORY
+  flags:
+    - flag: -r
+      description: Copy directories recursively.
+    - flag: -i
+      description: Ask before overwriting.
+    - flag: -n
+      description: Never overwrite existing files.
+    - flag: -p
+      description: Preserve mode, ownership and timestamps.
+    - flag: -a
+      description: Archive mode (GNU) — recursive and preserve everything; ideal for backups.
+    - flag: -v
+      description: Print each copy.
+  examples:
+    - code: cp app.conf app.conf.bak
+      description: A quick backup before editing.
+    - code: cp -r projects/website /tmp/site-copy
+      description: Copy a whole directory tree.
+    - code: cp -a ~/projects /backup/
+      description: Preserve permissions and times (GNU).
+    - code: cp -- *.txt notes/
+      description: Copy several files into a directory (the last argument).
+  useCases:
+    - Backing up configuration before changes.
+    - Duplicating templates for new projects.
+  mistakes:
+    - Overwriting silently — `cp` replaces existing files without asking unless you use `-i` or `-n`.
+    - "Trailing slash confusion: `cp -r src dest` creates `dest/src` if dest exists, but copies src *as* dest if it doesn't."
+  related: [mv, rsync]
+  portability: "`-a` is GNU (macOS cp supports `-a` too, but not all GNU long options)."
+
+mv:
+  category: Files
+  origin: posix-utility
+  summary: Move or rename files and directories.
+  why: >-
+    Renaming and moving are the same operation in Unix. Within one filesystem `mv` is atomic and instant — it just
+    changes a directory entry — which makes it the standard way to "publish" a file safely.
+  syntax:
+    - mv [OPTION]... SOURCE DEST
+    - mv [OPTION]... SOURCE... DIRECTORY
+  flags:
+    - flag: -i
+      description: Ask before overwriting.
+    - flag: -n
+      description: Never overwrite.
+    - flag: -v
+      description: Explain what is being done.
+  examples:
+    - code: mv draft.txt final.txt
+      description: Rename a file.
+    - code: mv *.jpg photos/
+      description: Move several files into a directory.
+    - code: |
+        generate_report > report.tmp && mv report.tmp report.html
+      description: Write to a temporary name, then rename — readers never see a half-written file.
+  useCases:
+    - Renaming files, organising downloads.
+    - Atomic replacement of config or output files.
+  mistakes:
+    - Overwriting a file you meant to keep — `mv` replaces the destination without warning.
+    - Assuming moves across filesystems are atomic; they become copy-then-delete.
+  related: [cp, rm]
+
+file:
+  category: Files
+  origin: external-tool
+  summary: Identify a file's type by inspecting its contents.
+  why: >-
+    Unix doesn't rely on file extensions. `file` reads the first bytes ("magic numbers") to tell you whether something
+    is text, a script, an image, an archive or a binary.
+  syntax:
+    - file [-b] [-i] FILE...
+  flags:
+    - flag: -b
+      description: Brief — don't print the file name.
+    - flag: -i
+      description: Print a MIME type such as text/plain.
+  examples:
+    - code: file notes.txt projects/scripts/backup.sh /usr/bin/ls
+      description: Text, a shell script and an executable binary.
+    - code: file photos/*
+      description: Detect what files really are, regardless of extension.
+  useCases:
+    - Checking a download isn't an HTML error page saved as `.tar.gz`.
+    - Detecting Windows (CRLF) line endings that break scripts.
+  mistakes:
+    - Trusting extensions instead; a `.txt` can be anything.
+  related: [stat]
+
+stat:
+  category: Files
+  origin: gnu-coreutils
+  summary: Show detailed file metadata — size, permissions, owner, inode and timestamps.
+  why: "`ls -l` shows a summary; `stat` shows everything, and `-c` prints exactly the fields a script needs."
+  syntax:
+    - stat [-c FORMAT] FILE...
+  flags:
+    - flag: -c FORMAT
+      description: "Custom output: %s size, %a octal permissions, %A symbolic, %U owner, %y modification time, %n name (GNU)."
+  examples:
+    - code: stat notes.txt
+      description: Full metadata.
+    - code: stat -c '%s %n' data/*.csv
+      description: Size and name of each CSV.
+    - code: |
+        perms=$(stat -c %a ~/.ssh)
+        [[ $perms == 700 ]] || echo "warning: ~/.ssh is $perms"
+      description: Check permissions in a script.
+  useCases:
+    - Verifying permissions and ownership in security checks.
+    - Getting exact sizes and modification times for comparisons.
+  mistakes:
+    - Using GNU `stat -c` on macOS, where the equivalent is `stat -f`.
+  related: [ls, file, chmod]
+  portability: "Not POSIX. GNU uses `-c FORMAT`, BSD/macOS uses `-f FORMAT` with different letters."
+
+basename:
+  category: Files
+  origin: posix-utility
+  summary: Strip the directory part (and optionally a suffix) from a path.
+  why: Scripts constantly need "just the file name" from a full path, e.g. to build output names.
+  syntax:
+    - basename NAME [SUFFIX]
+    - basename -s SUFFIX NAME...   (GNU)
+  examples:
+    - code: basename /var/log/nginx/access.log
+      description: The last path component.
+      output: access.log
+    - code: basename /data/report.csv .csv
+      description: Remove a suffix as well.
+      output: report
+    - code: echo "${path##*/}"
+      description: The pure-Bash equivalent with parameter expansion — no subprocess, much faster in loops.
+  useCases:
+    - Building output file names from input paths.
+  mistakes:
+    - Calling `basename` thousands of times in a loop. Use `${path##*/}` instead.
+  related: [dirname]
+
+dirname:
+  category: Files
+  origin: posix-utility
+  summary: Strip the last component from a path, leaving the directory.
+  why: Find the folder containing a file — for example, where the running script lives.
+  syntax:
+    - dirname NAME...
+  examples:
+    - code: dirname /var/log/nginx/access.log
+      description: The directory part.
+      output: /var/log/nginx
+    - code: |
+        script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+      description: The absolute directory of the running script — a very common idiom.
+    - code: echo "${path%/*}"
+      description: Pure-Bash equivalent (but it differs for paths without a slash).
+  useCases:
+    - Locating files that ship next to a script.
+    - Creating the parent directory of an output file (`mkdir -p "$(dirname "$out")"`).
+  mistakes:
+    - Assuming `${path%/*}` is identical — for `file.txt` it returns `file.txt`, while `dirname` returns `.`.
+  related: [basename, pwd]

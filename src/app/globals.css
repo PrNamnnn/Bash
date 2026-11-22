@@ -1,26 +1,178 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-bg: #0a0b0d;
+  --color-surface: #0f1114;
+  --color-surface-2: #14171b;
+  --color-surface-3: #1a1e23;
+  --color-inset: #08090b;
+  --color-line: #1e2228;
+  --color-line-strong: #2a2f37;
+  --color-fg: #e6e8eb;
+  --color-fg-muted: #a0a7b1;
+  --color-fg-subtle: #6b727c;
+  --color-accent: #5fd49b;
+  --color-accent-strong: #7be3b0;
+  --color-accent-dim: #183428;
+  --color-accent-fg: #04140c;
+  --color-amber: #f2b45a;
+  --color-amber-dim: #33260f;
+  --color-red: #f37b7b;
+  --color-red-dim: #351717;
+  --color-blue: #7fb2ff;
+  --color-blue-dim: #142238;
+  --color-violet: #b9a3ff;
+  --color-violet-dim: #221b3a;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --animate-fade-in: fade-in 160ms ease-out both;
+  --animate-blink: blink 1.1s steps(1) infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(2px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
   }
 }
 
+:root {
+  color-scheme: dark;
+  --header-h: 56px;
+}
+
+html {
+  background: var(--color-bg);
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: calc(var(--header-h) + 16px);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  color: var(--color-fg);
+}
+
+/* In the base layer so components can opt out with utilities like focus:outline-none. */
+@layer base {
+  *:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Syntax highlighting tokens (shared by static code blocks and the editor) */
+.tok-com { color: #6b737e; font-style: italic; }
+.tok-kw { color: #c4a5ff; }
+.tok-builtin { color: #7fb2ff; }
+.tok-cmd { color: #7fd4f5; }
+.tok-str { color: #e8c37a; }
+.tok-var { color: #f59e8b; }
+.tok-num { color: #f5a97f; }
+.tok-op { color: #8fa1b3; }
+.tok-flag { color: #a6d189; }
+.tok-sub { color: #f59e8b; }
+.tok-plain { color: var(--color-fg); }
+
+/* Prose used for lesson text */
+.prose-lesson {
+  color: #cfd3d9;
+  font-size: 15.5px;
+  line-height: 1.75;
+}
+.prose-lesson strong {
+  color: var(--color-fg);
+  font-weight: 600;
+}
+.prose-lesson a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  text-underline-offset: 3px;
+}
+.prose-lesson a:hover {
+  text-decoration-color: var(--color-accent);
+}
+
+.inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-line);
+  border-radius: 5px;
+  padding: 0.08em 0.38em;
+  color: #e9ecef;
+  white-space: break-spaces;
+  overflow-wrap: anywhere;
+}
+
+/* Terminal */
+.term-scroll {
+  overscroll-behavior: contain;
+}
+.ansi-bold { font-weight: 700; }
+.ansi-dim { opacity: 0.7; }
+.ansi-italic { font-style: italic; }
+.ansi-underline { text-decoration: underline; }
+.ansi-inverse { background: var(--color-fg); color: var(--color-bg); }
+
+/* Utility: hide scrollbar but keep scrolling */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Grid paper background for hero/visualizations, very subtle */
+.bg-grid {
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
 }

@@ -1,0 +1,337 @@
+pwd:
+  category: Basics
+  origin: bash-builtin
+  summary: Print the absolute path of the current working directory.
+  why: >-
+    Every process has a current working directory, and relative paths are resolved against it. `pwd` tells you where
+    "here" is, which is the first thing to check whenever a command can't find a file.
+  syntax:
+    - pwd [-L | -P]
+  flags:
+    - flag: -L
+      description: Print the logical path, keeping symbolic links as you navigated them (default).
+    - flag: -P
+      description: Print the physical path with all symbolic links resolved.
+  examples:
+    - code: pwd
+      description: Show where you are.
+      output: /home/learner
+    - code: |
+        cd /tmp && pwd
+      description: After changing directory, `pwd` reflects the new location.
+      output: /tmp
+    - code: |
+        here=$(pwd)
+        echo "Script started in $here"
+      description: Capture the directory in a variable. In scripts, `$PWD` is equivalent and avoids running a command.
+  useCases:
+    - Confirm your location before running destructive commands like `rm -r`.
+    - Record the starting directory in a script so you can return to it.
+    - Debug "No such file or directory" errors caused by being in the wrong place.
+  mistakes:
+    - Assuming a script runs in the directory where the script file lives. It runs in the caller's current directory; use `cd "$(dirname "$0")"` if you need the script's own folder.
+  related: [cd, ls, dirname]
+  portability: Both a Bash builtin and `/bin/pwd`. `$PWD` is set by every POSIX shell.
+
+whoami:
+  category: Basics
+  origin: gnu-coreutils
+  summary: Print the user name of the current effective user.
+  why: >-
+    Permissions depend on who you are. After `sudo`, `su` or SSH-ing into a server, `whoami` answers "which account
+    am I acting as right now?".
+  syntax:
+    - whoami
+  examples:
+    - code: whoami
+      description: Show your user name.
+      output: learner
+    - code: |
+        if [[ $(whoami) != root ]]; then
+          echo "please run as root" >&2
+          exit 1
+        fi
+      description: A common guard at the top of admin scripts. Comparing `$EUID` to 0 is faster and does not need a subprocess.
+  useCases:
+    - Verify which account a script, cron job or container runs as.
+    - Guard scripts that must (or must not) run as root.
+  mistakes:
+    - Using `$USER` in scripts that run under sudo — `$USER` may still show the original user, while `whoami` shows the effective one.
+  related: [hostname, uname]
+  portability: Available on Linux and macOS. `id -un` is the POSIX equivalent.
+
+hostname:
+  category: Basics
+  origin: linux-specific
+  summary: Show (or, as root, set) the system's host name.
+  why: >-
+    When you manage several machines over SSH, the host name tells you which one you are on. Scripts also embed it in
+    log lines and backup file names.
+  syntax:
+    - hostname [-f | -I | -s]
+  flags:
+    - flag: -f
+      description: Fully qualified domain name, e.g. web01.example.com.
+    - flag: -s
+      description: Short name, cut at the first dot.
+    - flag: -I
+      description: All IP addresses of the host (Linux only).
+  examples:
+    - code: hostname
+      description: Print the host name.
+      output: bash-mastery
+    - code: |
+        backup="db-$(hostname -s)-$(date +%F).sql.gz"
+        echo "$backup"
+      description: Include the host name in a file name so backups from different servers never collide.
+      output: db-bash-mastery-2026-11-17.sql.gz
+  useCases:
+    - Tag log lines and alerts with the machine they came from.
+    - Make prompts show which server you are on.
+  mistakes:
+    - Relying on `hostname -I` in portable scripts — the flag doesn't exist on macOS/BSD.
+  related: [uname, whoami]
+  portability: "`hostname` exists everywhere, but its flags differ. `$HOSTNAME` is a Bash variable that avoids running the command."
+
+uname:
+  category: Basics
+  origin: posix-utility
+  summary: Print information about the operating system kernel and hardware.
+  why: >-
+    Scripts that must behave differently on Linux and macOS, or on x86_64 and ARM, use `uname` to find out where they
+    are running.
+  syntax:
+    - uname [-asnrvmo]
+  flags:
+    - flag: -s
+      description: Kernel name, e.g. Linux or Darwin (the default with no flags).
+    - flag: -r
+      description: Kernel release.
+    - flag: -m
+      description: Machine hardware name, e.g. x86_64 or arm64.
+    - flag: -n
+      description: Network node name (host name).
+    - flag: -a
+      description: Everything.
+  examples:
+    - code: uname -a
+      description: Show all fields.
+      output: Linux bash-mastery 6.8.0-sim #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux
+    - code: |
+        case "$(uname -s)" in
+          Linux)  sed_inplace=(sed -i) ;;
+          Darwin) sed_inplace=(sed -i '') ;;
+        esac
+      description: Choose platform-specific behaviour, here the different in-place syntax of GNU and BSD `sed`.
+  useCases:
+    - Detect the platform in install scripts and dotfiles.
+    - Pick the right binary to download for the CPU architecture (`uname -m`).
+  mistakes:
+    - Assuming `uname -o` exists everywhere — it is a GNU extension.
+  related: [hostname]
+  portability: "POSIX defines -a -m -n -r -s -v. Bash also provides `$OSTYPE` and `$HOSTTYPE` without spawning a process."
+
+date:
+  category: Basics
+  origin: gnu-coreutils
+  summary: Print the current date and time in any format, or convert between date formats.
+  why: >-
+    Timestamps are everywhere in automation: log lines, backup names, report headers, measuring durations. `date`
+    formats time precisely with `+FORMAT` strings.
+  syntax:
+    - date [+FORMAT]
+    - date -d STRING [+FORMAT]   (GNU)
+    - date -u [+FORMAT]
+  flags:
+    - flag: +FORMAT
+      description: "Output format: %Y year, %m month, %d day, %H:%M:%S time, %F = %Y-%m-%d, %s seconds since 1970, %A weekday."
+    - flag: -u
+      description: Use UTC instead of local time.
+    - flag: -d STRING
+      description: "GNU: describe a different time, e.g. 'yesterday', '2 days ago', '@1700000000'."
+    - flag: -I
+      description: ISO 8601 date (e.g. 2026-11-17).
+  examples:
+    - code: date +%F
+      description: ISO date — sorts correctly as text, ideal for file names.
+      output: 2026-11-17
+    - code: |
+        stamp=$(date +%Y%m%d-%H%M%S)
+        cp app.conf "app.conf.$stamp"
+      description: A timestamped backup copy.
+    - code: |
+        start=$(date +%s)
+        sleep 2
+        echo "took $(( $(date +%s) - start ))s"
+      description: Measure elapsed seconds. Bash also offers `$SECONDS` and `$EPOCHSECONDS` for this.
+    - code: date -d '7 days ago' +%F
+      description: GNU date arithmetic — on macOS use `date -v-7d +%F`.
+  useCases:
+    - Time-stamped log lines and backup files.
+    - Computing cut-off dates for cleanup jobs.
+    - Measuring how long a step took.
+  mistakes:
+    - Using `%D` or `%c` in file names; they contain slashes or spaces. Prefer `%F` or `%Y%m%d-%H%M%S`.
+    - Assuming `-d` works on macOS — BSD date uses `-v` and `-j -f` instead.
+  related: [cal]
+  portability: The format specifiers are POSIX; `-d`, `-I` and `%N` are GNU extensions.
+
+cal:
+  category: Basics
+  origin: external-tool
+  summary: Display a calendar for a month or year.
+  why: A quick way to see which weekday a date falls on without leaving the terminal.
+  syntax:
+    - cal [[month] year]
+  examples:
+    - code: cal
+      description: The current month.
+    - code: cal 12 2026
+      description: A specific month.
+  useCases:
+    - Check dates when writing cron schedules or planning maintenance windows.
+  mistakes:
+    - Expecting `cal` on minimal servers or containers; it comes from the `ncal`/`util-linux` packages and is often missing.
+  related: [date]
+
+clear:
+  category: Basics
+  origin: external-tool
+  summary: Clear the terminal screen.
+  why: >-
+    Removes visual clutter. It is a separate program (from ncurses) that sends an escape sequence telling the terminal
+    to wipe the screen — the scrollback may still be there.
+  syntax:
+    - clear
+  examples:
+    - code: clear
+      description: Clear the screen. <kbd>Ctrl</kbd>+<kbd>L</kbd> does the same in an interactive shell.
+  useCases:
+    - Start a fresh screen before a demo or a long command whose output you want to read from the top.
+  mistakes:
+    - Calling `clear` in scripts whose output may be redirected to a file — it writes escape codes into the file.
+  related: [history]
+
+history:
+  category: Basics
+  origin: bash-builtin
+  summary: List, search and reuse the commands you have typed.
+  why: >-
+    Retyping long commands is slow and error-prone. Bash records interactive commands so you can recall them with the
+    arrow keys, `Ctrl+R` reverse search, or history expansion like `!!`.
+  syntax:
+    - history [N]
+    - history -c
+  flags:
+    - flag: "N"
+      description: Show only the last N entries.
+    - flag: -c
+      description: Clear the history list.
+    - flag: -d OFFSET
+      description: Delete one entry (useful after accidentally typing a password).
+  examples:
+    - code: history 5
+      description: The five most recent commands, numbered.
+    - code: |
+        sudo !!
+      description: "`!!` expands to the previous command — the classic fix after forgetting sudo."
+    - code: '!grep'
+      description: Re-run the most recent command that started with `grep`.
+  useCases:
+    - Recover a long command you ran yesterday (`history | grep rsync`).
+    - Turn an interactive session into a script by copying commands from history.
+  mistakes:
+    - Typing secrets on the command line — they end up in `~/.bash_history`. Read them from a file or prompt with `read -s` instead.
+    - Expecting `history` to work inside scripts; history is an interactive feature.
+  related: [clear]
+  portability: Bash builtin. Configure with HISTSIZE, HISTFILESIZE, HISTCONTROL=ignoreboth and `shopt -s histappend`.
+
+echo:
+  category: Basics
+  origin: bash-builtin
+  summary: Print its arguments separated by spaces, followed by a newline.
+  why: >-
+    The simplest way to produce output: messages, variable values, quick tests. Its behaviour with options and
+    backslashes varies between shells, so serious scripts often prefer printf.
+  syntax:
+    - echo [-neE] [STRING]...
+  flags:
+    - flag: -n
+      description: Do not print the trailing newline.
+    - flag: -e
+      description: Interpret backslash escapes such as \n and \t (Bash).
+    - flag: -E
+      description: Do not interpret escapes (the Bash default).
+  examples:
+    - code: echo "Hello, $USER"
+      description: Double quotes allow variable expansion.
+      output: Hello, learner
+    - code: echo 'Cost: $5'
+      description: Single quotes print everything literally.
+      output: 'Cost: $5'
+    - code: echo -e "line1\nline2"
+      description: With `-e`, `\n` becomes a newline.
+      output: |
+        line1
+        line2
+    - code: echo "error: file missing" >&2
+      description: Send a message to standard error.
+  useCases:
+    - Status and progress messages in scripts.
+    - Quick inspection of variables while debugging.
+  mistakes:
+    - Printing data that might start with `-` or contain backslashes, e.g. `echo "$var"` where var is `-n`. Use `printf '%s\n' "$var"`.
+    - Writing `echo $var` without quotes — whitespace collapses and globs expand.
+  related: [printf]
+  portability: "POSIX leaves `-n` and backslash handling implementation-defined: `sh` (dash) interprets escapes by default, Bash does not. Use printf for portable scripts."
+
+printf:
+  category: Basics
+  origin: bash-builtin
+  summary: Print formatted text using a format string with placeholders.
+  why: >-
+    `printf` behaves the same in every shell, never adds an unexpected newline, handles data that starts with `-`
+    safely, and can align columns and format numbers.
+  syntax:
+    - printf FORMAT [ARGUMENT]...
+    - printf -v VAR FORMAT [ARGUMENT]...   (Bash)
+  flags:
+    - flag: "%s"
+      description: String.
+    - flag: "%d"
+      description: Integer.
+    - flag: "%.2f"
+      description: Floating point with two decimals.
+    - flag: "%-10s / %5d"
+      description: Left-align in 10 columns / right-align in 5.
+    - flag: "%q"
+      description: Shell-quote the argument so it can be safely reused as input (Bash).
+    - flag: -v VAR
+      description: Store the result in a variable instead of printing (Bash).
+  examples:
+    - code: printf '%s has %d files\n' "$HOME" 42
+      description: Placeholders are filled in order.
+      output: /home/learner has 42 files
+    - code: printf '%s\n' apple banana cherry
+      description: The format is reused until all arguments are consumed — one line per item.
+      output: |
+        apple
+        banana
+        cherry
+    - code: printf '%-8s %6.2f\n' lamp 24.5 desk 189
+      description: Aligned columns.
+      output: |
+        lamp      24.50
+        desk     189.00
+    - code: printf -v padded '%05d' 42; echo "$padded"
+      description: Format into a variable without a subshell.
+      output: "00042"
+  useCases:
+    - Reports and tables with aligned columns.
+    - Printing arbitrary data safely (`printf '%s\n' "$line"`).
+    - Zero-padding numbers in file names.
+  mistakes:
+    - Putting variables in the format string — `printf "$msg"` misbehaves if msg contains `%`. Use `printf '%s\n' "$msg"`.
+    - Forgetting the `\n`; printf never adds a newline itself.
+  related: [echo]
+  portability: "POSIX utility and Bash builtin. `%q` and `-v` are Bash-only."
