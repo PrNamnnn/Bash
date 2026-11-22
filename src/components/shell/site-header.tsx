@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { NavLinks } from "./nav-links";
+import { LogoMark } from "./logo-mark";
 import { MobileNav } from "./mobile-nav";
 import { SearchButton } from "@/components/search/search-button";
 import { HeaderProgress } from "@/components/progress/header-progress";
@@ -8,9 +9,7 @@ import { allLessons } from "@/lib/curriculum";
 export function Logo() {
   return (
     <Link href="/" className="group flex shrink-0 items-center gap-2.5 rounded-md" aria-label="Bash Mastery home">
-      <span className="grid h-7 w-7 place-items-center rounded-md border border-line-strong bg-surface-2 font-mono text-[12px] font-semibold text-accent transition-colors group-hover:border-accent/50">
-        $_
-      </span>
+      <LogoMark size={28} />
       <span className="text-[15px] font-semibold tracking-tight text-fg">
         Bash<span className="text-fg-subtle">/</span>Mastery
       </span>
